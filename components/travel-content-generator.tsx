@@ -1075,19 +1075,40 @@ Technische details: ${error.message}`)
                     {contentTypes.slice(0, 3).map((contentType) => {
                       const isSelected = selectedContentType === contentType.id
                       return (
-                        <Card
+                        <button
                           key={contentType.id}
-                          className={`cursor-pointer transition-all hover:shadow-md ${
-                            isSelected ? "border-blue-400 bg-blue-50 shadow-md" : "hover:border-gray-300"
+                          className={`group relative p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                            isSelected
+                              ? "border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-md"
+                              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                           }`}
                           onClick={() => setSelectedContentType(contentType.id)}
                         >
-                          <CardContent className="p-4 text-center">
-                            <div className="flex justify-center mb-2 text-orange-500">{contentType.icon}</div>
-                            <h4 className="font-medium text-sm text-gray-900">{contentType.title}</h4>
-                            {contentType.premium && <Badge className="mt-1 text-xs">Premium</Badge>}
-                          </CardContent>
-                        </Card>
+                          <div
+                            className={`flex justify-center mb-2 transition-colors ${
+                              isSelected ? "text-blue-600" : "text-gray-500 group-hover:text-blue-500"
+                            }`}
+                          >
+                            {contentType.icon}
+                          </div>
+                          <h4
+                            className={`font-medium text-sm transition-colors ${
+                              isSelected ? "text-blue-900" : "text-gray-900"
+                            }`}
+                          >
+                            {contentType.title}
+                          </h4>
+                          {contentType.premium && (
+                            <Badge className="mt-1 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                              Premium
+                            </Badge>
+                          )}
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </div>
+                          )}
+                        </button>
                       )
                     })}
                   </div>
@@ -1158,15 +1179,35 @@ Technische details: ${error.message}`)
                     {writingStyles.map((style) => {
                       const isSelected = selectedWritingStyle === style.id
                       return (
-                        <Button
+                        <button
                           key={style.id}
-                          variant={isSelected ? "default" : "outline"}
+                          className={`group relative p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                            isSelected
+                              ? "border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-md"
+                              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                          }`}
                           onClick={() => setSelectedWritingStyle(style.id)}
-                          className={`h-auto p-3 flex-col ${isSelected ? "bg-blue-400 hover:bg-blue-500 border-blue-400" : ""}`}
                         >
-                          <div className="flex justify-center mb-1">{style.icon}</div>
-                          <div className="text-sm font-medium">{style.name}</div>
-                        </Button>
+                          <div
+                            className={`flex justify-center mb-2 transition-colors ${
+                              isSelected ? "text-blue-600" : "text-gray-500 group-hover:text-blue-500"
+                            }`}
+                          >
+                            {style.icon}
+                          </div>
+                          <div
+                            className={`text-sm font-medium transition-colors ${
+                              isSelected ? "text-blue-900" : "text-gray-900"
+                            }`}
+                          >
+                            {style.name}
+                          </div>
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </div>
+                          )}
+                        </button>
                       )
                     })}
                   </div>
@@ -1181,19 +1222,36 @@ Technische details: ${error.message}`)
                     {imageStyles.map((style) => {
                       const isSelected = selectedImageStyle === style.id
                       return (
-                        <Card
+                        <button
                           key={style.id}
-                          className={`cursor-pointer transition-all hover:shadow-md ${
-                            isSelected ? "border-blue-400 bg-blue-50 shadow-md" : "hover:border-gray-300"
+                          className={`group relative p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                            isSelected
+                              ? "border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-md"
+                              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                           }`}
                           onClick={() => setSelectedImageStyle(style.id)}
                         >
-                          <CardContent className="p-4 text-center">
-                            <div className={`text-2xl mb-2 ${style.color}`}>{style.icon}</div>
-                            <h4 className="font-medium text-sm text-gray-900 mb-1">{style.name}</h4>
-                            <p className="text-xs text-gray-600">{style.description}</p>
-                          </CardContent>
-                        </Card>
+                          <div
+                            className={`text-2xl mb-2 transition-colors ${
+                              isSelected ? style.color : `${style.color} group-hover:scale-110`
+                            }`}
+                          >
+                            {style.icon}
+                          </div>
+                          <h4
+                            className={`font-medium text-sm mb-1 transition-colors ${
+                              isSelected ? "text-blue-900" : "text-gray-900"
+                            }`}
+                          >
+                            {style.name}
+                          </h4>
+                          <p className="text-xs text-gray-600">{style.description}</p>
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </div>
+                          )}
+                        </button>
                       )
                     })}
                   </div>
@@ -1208,19 +1266,36 @@ Technische details: ${error.message}`)
                     {routeTypes.map((routeType) => {
                       const isSelected = selectedRouteType === routeType.id
                       return (
-                        <Card
+                        <button
                           key={routeType.id}
-                          className={`cursor-pointer transition-all hover:shadow-md ${
-                            isSelected ? "border-blue-400 bg-blue-50 shadow-md" : "hover:border-gray-300"
+                          className={`group relative p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                            isSelected
+                              ? "border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-md"
+                              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                           }`}
                           onClick={() => setSelectedRouteType(routeType.id)}
                         >
-                          <CardContent className="p-4 text-center">
-                            <div className={`flex justify-center mb-2 ${routeType.color}`}>{routeType.icon}</div>
-                            <h4 className="font-medium text-sm text-gray-900">{routeType.name}</h4>
-                            <p className="text-xs text-gray-600 mt-1">{routeType.description}</p>
-                          </CardContent>
-                        </Card>
+                          <div
+                            className={`flex justify-center mb-2 transition-all duration-300 ${
+                              isSelected ? routeType.color : `${routeType.color} group-hover:scale-110`
+                            }`}
+                          >
+                            {routeType.icon}
+                          </div>
+                          <h4
+                            className={`font-medium text-sm transition-colors ${
+                              isSelected ? "text-blue-900" : "text-gray-900"
+                            }`}
+                          >
+                            {routeType.name}
+                          </h4>
+                          <p className="text-xs text-gray-600 mt-1">{routeType.description}</p>
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </div>
+                          )}
+                        </button>
                       )
                     })}
                   </div>
@@ -1235,19 +1310,32 @@ Technische details: ${error.message}`)
                     {dayOptions.map((dayOption) => {
                       const isSelected = selectedDays === dayOption.id
                       return (
-                        <Card
+                        <button
                           key={dayOption.id}
-                          className={`cursor-pointer transition-all hover:shadow-md ${
-                            isSelected ? "border-blue-400 bg-blue-50 shadow-md" : "hover:border-gray-300"
+                          className={`group relative p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                            isSelected
+                              ? "border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-md"
+                              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                           }`}
                           onClick={() => setSelectedDays(dayOption.id)}
                         >
-                          <CardContent className="p-4 text-center">
-                            <div className="text-2xl mb-2">{dayOption.icon}</div>
-                            <h4 className="font-medium text-sm text-gray-900">{dayOption.name}</h4>
-                            <p className="text-xs text-gray-600 mt-1">{dayOption.description}</p>
-                          </CardContent>
-                        </Card>
+                          <div className="text-2xl mb-2 transition-transform duration-300 group-hover:scale-110">
+                            {dayOption.icon}
+                          </div>
+                          <h4
+                            className={`font-medium text-sm transition-colors ${
+                              isSelected ? "text-blue-900" : "text-gray-900"
+                            }`}
+                          >
+                            {dayOption.name}
+                          </h4>
+                          <p className="text-xs text-gray-600 mt-1">{dayOption.description}</p>
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </div>
+                          )}
+                        </button>
                       )
                     })}
                   </div>
@@ -1262,19 +1350,32 @@ Technische details: ${error.message}`)
                     {budgetLevels.map((budget) => {
                       const isSelected = selectedBudgetLevel === budget.id
                       return (
-                        <Card
+                        <button
                           key={budget.id}
-                          className={`cursor-pointer transition-all hover:shadow-md ${
-                            isSelected ? "border-blue-400 bg-blue-50 shadow-md" : "hover:border-gray-300"
+                          className={`group relative p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                            isSelected
+                              ? "border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-md"
+                              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                           }`}
                           onClick={() => setSelectedBudgetLevel(budget.id)}
                         >
-                          <CardContent className="p-4 text-center">
-                            <div className="text-2xl mb-2">{budget.icon}</div>
-                            <h4 className="font-medium text-sm text-gray-900">{budget.name}</h4>
-                            <p className="text-xs text-gray-600 mt-1">{budget.description}</p>
-                          </CardContent>
-                        </Card>
+                          <div className="text-2xl mb-2 transition-transform duration-300 group-hover:scale-110">
+                            {budget.icon}
+                          </div>
+                          <h4
+                            className={`font-medium text-sm transition-colors ${
+                              isSelected ? "text-blue-900" : "text-gray-900"
+                            }`}
+                          >
+                            {budget.name}
+                          </h4>
+                          <p className="text-xs text-gray-600 mt-1">{budget.description}</p>
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </div>
+                          )}
+                        </button>
                       )
                     })}
                   </div>
@@ -1289,19 +1390,32 @@ Technische details: ${error.message}`)
                     {vacationTypes.map((vacation) => {
                       const isSelected = selectedVacationType === vacation.id
                       return (
-                        <Card
+                        <button
                           key={vacation.id}
-                          className={`cursor-pointer transition-all hover:shadow-md ${
-                            isSelected ? "border-blue-400 bg-blue-50 shadow-md" : "hover:border-gray-300"
+                          className={`group relative p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                            isSelected
+                              ? "border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 shadow-md"
+                              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                           }`}
                           onClick={() => setSelectedVacationType(vacation.id)}
                         >
-                          <CardContent className="p-4 text-center">
-                            <div className="text-2xl mb-2">{vacation.icon}</div>
-                            <h4 className="font-medium text-sm text-gray-900">{vacation.name}</h4>
-                            <p className="text-xs text-gray-600 mt-1">{vacation.description}</p>
-                          </CardContent>
-                        </Card>
+                          <div className="text-2xl mb-2 transition-transform duration-300 group-hover:scale-110">
+                            {vacation.icon}
+                          </div>
+                          <h4
+                            className={`font-medium text-sm transition-colors ${
+                              isSelected ? "text-blue-900" : "text-gray-900"
+                            }`}
+                          >
+                            {vacation.name}
+                          </h4>
+                          <p className="text-xs text-gray-600 mt-1">{vacation.description}</p>
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </div>
+                          )}
+                        </button>
                       )
                     })}
                   </div>
