@@ -116,7 +116,10 @@ interface HolidayPackage {
 function ImageSlideshow({ images, alt }: { images: string[]; alt: string }) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  if (!images || images.length === 0) {
+  // Safe array handling
+  const safeImages = Array.isArray(images) ? images.filter(Boolean) : []
+
+  if (safeImages.length === 0) {
     return (
       <img
         src={`/placeholder.svg?height=200&width=300&text=${encodeURIComponent(alt)}`}
@@ -126,55 +129,55 @@ function ImageSlideshow({ images, alt }: { images: string[]; alt: string }) {
     )
   }
 
-  if (images.length === 1) {
+  if (safeImages.length === 1) {
     return (
-      <img src={images[0] || "/placeholder.svg"} alt={alt} className="w-full h-48 object-cover rounded-lg shadow-md" />
+      <img
+        src={safeImages[0] || "/placeholder.svg"}
+        alt={alt}
+        className="w-full h-48 object-cover rounded-lg shadow-md"
+      />
     )
   }
 
   const nextImage = () => {
-    setCurrentIndex((prev) => (prev + 1) % images.length)
+    setCurrentIndex((prev) => (prev + 1) % safeImages.length)
   }
 
   const prevImage = () => {
-    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length)
+    setCurrentIndex((prev) => (prev - 1 + safeImages.length) % safeImages.length)
   }
 
   return (
     <div className="relative">
       <img
-        src={images[currentIndex] || "/placeholder.svg"}
+        src={safeImages[currentIndex] || "/placeholder.svg"}
         alt={alt}
         className="w-full h-48 object-cover rounded-lg shadow-md"
       />
-      {images.length > 1 && (
-        <>
+      <button
+        onClick={prevImage}
+        className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <button
+        onClick={nextImage}
+        className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
+        {safeImages.map((_, index) => (
           <button
-            onClick={prevImage}
-            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            onClick={nextImage}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
-            {images.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                className={`w-2 h-2 rounded-full ${index === currentIndex ? "bg-white" : "bg-white/50"}`}
-              />
-            ))}
-          </div>
-          <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
-            {currentIndex + 1} / {images.length}
-          </div>
-        </>
-      )}
+            key={index}
+            onClick={() => setCurrentIndex(index)}
+            className={`w-2 h-2 rounded-full ${index === currentIndex ? "bg-white" : "bg-white/50"}`}
+          />
+        ))}
+      </div>
+      <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+        {currentIndex + 1} / {safeImages.length}
+      </div>
     </div>
   )
 }
@@ -195,7 +198,95 @@ export default function PackageWerkbladPage() {
         console.log("📋 Parsed holiday package data:", packageData)
 
         if (packageData && typeof packageData === "object") {
-          setHolidayPackage(packageData)
+          // Ensure all arrays are properly initialized
+          const safePackageData: HolidayPackage = {
+            id: packageData.id || "UNKNOWN",
+            name: packageData.name || "Untitled Holiday Package",
+            description: packageData.description || "",
+            shortDescription: packageData.shortDescription || "",
+            imageUrl: packageData.imageUrl || "",
+            duration: packageData.duration || 0,
+            destinations: Array.isArray(packageData.destinations) ? packageData.destinations : [],
+            themes: Array.isArray(packageData.themes) ? packageData.themes : [],
+            priceFrom: packageData.priceFrom || { amount: 0, currency: "EUR" },
+            pricePerPerson: packageData.pricePerPerson || { amount: 0, currency: "EUR" },
+            totalPrice: packageData.totalPrice || { amount: 0, currency: "EUR" },
+            departureDate: packageData.departureDate || "",
+            returnDate: packageData.returnDate || "",
+            availability: packageData.availability || {
+              available: true,
+              spotsLeft: 0,
+              totalSpots: 0,
+            },
+            inclusions: Array.isArray(packageData.inclusions) ? packageData.inclusions : [],
+            exclusions: Array.isArray(packageData.exclusions) ? packageData.exclusions : [],
+            itinerary: Array.isArray(packageData.itinerary)
+              ? packageData.itinerary.map((day: any) => ({
+                  day: day.day || 0,
+                  title: day.title || "",
+                  description: day.description || "",
+                  activities: Array.isArray(day.activities) ? day.activities : [],
+                  accommodation: day.accommodation || "",
+                  meals: Array.isArray(day.meals) ? day.meals : [],
+                }))
+              : [],
+            accommodations: Array.isArray(packageData.accommodations)
+              ? packageData.accommodations.map((acc: any) => ({
+                  name: acc.name || "",
+                  type: acc.type || "",
+                  category: acc.category || 0,
+                  location: acc.location || "",
+                  description: acc.description || "",
+                  amenities: Array.isArray(acc.amenities) ? acc.amenities : [],
+                  images: Array.isArray(acc.images) ? acc.images : [],
+                }))
+              : [],
+            transports: Array.isArray(packageData.transports)
+              ? packageData.transports.map((transport: any) => ({
+                  type: transport.type || "",
+                  from: transport.from || "",
+                  to: transport.to || "",
+                  date: transport.date || "",
+                  time: transport.time || "",
+                  duration: transport.duration || "",
+                  company: transport.company || "",
+                }))
+              : [],
+            activities: Array.isArray(packageData.activities)
+              ? packageData.activities.map((activity: any) => ({
+                  name: activity.name || "",
+                  type: activity.type || "",
+                  description: activity.description || "",
+                  duration: activity.duration || "",
+                  included: activity.included || false,
+                  price: activity.price || undefined,
+                }))
+              : [],
+            bookingConditions: packageData.bookingConditions || {
+              cancellationPolicy: "Standard cancellation policy",
+              paymentTerms: "Payment required at booking",
+              minimumAge: 0,
+              maximumGroupSize: 50,
+              requiredDocuments: ["Valid passport"],
+            },
+            contact: packageData.contact || {
+              tourOperator: "Travel Compositor",
+              phone: "",
+              email: "",
+              website: "",
+            },
+            searchMethod: packageData.searchMethod || "Unknown",
+          }
+
+          // Ensure booking conditions arrays are safe
+          if (
+            safePackageData.bookingConditions.requiredDocuments &&
+            !Array.isArray(safePackageData.bookingConditions.requiredDocuments)
+          ) {
+            safePackageData.bookingConditions.requiredDocuments = ["Valid passport"]
+          }
+
+          setHolidayPackage(safePackageData)
         } else {
           setError("Ongeldige holiday package data structuur")
         }
@@ -259,12 +350,16 @@ export default function PackageWerkbladPage() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "Onbekend"
-    return new Date(dateString).toLocaleDateString("nl-NL", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
+    try {
+      return new Date(dateString).toLocaleDateString("nl-NL", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    } catch {
+      return dateString
+    }
   }
 
   const formatPrice = (price: { amount: number; currency: string }) => {
@@ -526,7 +621,7 @@ export default function PackageWerkbladPage() {
                   <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row gap-6">
                       <div className="md:w-1/3">
-                        <ImageSlideshow images={accommodation.images || []} alt={accommodation.name} />
+                        <ImageSlideshow images={accommodation.images} alt={accommodation.name} />
                       </div>
                       <div className="md:w-2/3">
                         <div className="flex justify-between items-start mb-4">
