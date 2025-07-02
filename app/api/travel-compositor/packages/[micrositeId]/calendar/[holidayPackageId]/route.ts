@@ -12,13 +12,23 @@ export async function GET(
 
     console.log(`📅 Fetching package calendar for ${holidayPackageId}`)
 
-    // Get credentials
+    // Get credentials based on config
     let username, password, actualMicrositeId
     switch (config) {
       case "1":
         username = process.env.TRAVEL_COMPOSITOR_USERNAME
         password = process.env.TRAVEL_COMPOSITOR_PASSWORD
         actualMicrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+        break
+      case "2":
+        username = process.env.TRAVEL_COMPOSITOR_USERNAME_2
+        password = process.env.TRAVEL_COMPOSITOR_PASSWORD_2
+        actualMicrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_2
+        break
+      case "3":
+        username = process.env.TRAVEL_COMPOSITOR_USERNAME_3
+        password = process.env.TRAVEL_COMPOSITOR_PASSWORD_3
+        actualMicrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_3
         break
       default:
         username = process.env.TRAVEL_COMPOSITOR_USERNAME
@@ -30,7 +40,7 @@ export async function GET(
       throw new Error(`Missing credentials for config ${config}`)
     }
 
-    // Authenticate
+    // Authenticate with Travel Compositor
     const authResponse = await fetch("https://online.travelcompositor.com/resources/authentication/authenticate", {
       method: "POST",
       headers: {
@@ -45,14 +55,15 @@ export async function GET(
     })
 
     if (!authResponse.ok) {
-      throw new Error(`Authentication failed: ${authResponse.status}`)
+      const errorText = await authResponse.text()
+      throw new Error(`Authentication failed: ${authResponse.status} - ${errorText}`)
     }
 
     const authData = await authResponse.json()
     const token = authData.token
 
-    // Get package calendar
-    const response = await fetch(
+    // Fetch Package Calendar
+    const calendarResponse = await fetch(
       `https://online.travelcompositor.com/resources/package/calendar/${actualMicrositeId}/${holidayPackageId}?currency=${currency}`,
       {
         method: "GET",
@@ -64,12 +75,12 @@ export async function GET(
       },
     )
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Get package calendar failed: ${response.status} - ${errorText}`)
+    if (!calendarResponse.ok) {
+      const errorText = await calendarResponse.text()
+      throw new Error(`Get package calendar failed: ${calendarResponse.status} - ${errorText}`)
     }
 
-    const calendarData = await response.json()
+    const calendarData = await calendarResponse.json()
 
     return NextResponse.json({
       success: true,
@@ -77,6 +88,16 @@ export async function GET(
       micrositeId: actualMicrositeId,
       holidayPackageId,
       currency,
+      endpoint: `https://online.travelcompositor.com/resources/package/calendar/${actualMicrositeId}/${holidayPackageId}`,
+      method: "GET",
+      headers: {
+        "auth-token": "REQUIRED",
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      queryParams: {
+        currency: currency,
+      },
     })
   } catch (error) {
     console.error("❌ Error fetching package calendar:", error)

@@ -205,6 +205,51 @@ export default function ImportPage() {
         setTimeout(() => {
           window.location.href = "/travelwerkblad"
         }, 2000)
+      } else if (selectedImportType === "travel-compositor" && travelCompositorType === "holiday-package") {
+        console.log("🏖️ Starting Travel Compositor holiday package import...")
+
+        // Prepare the request data
+        const requestData = {
+          packageId: bookingId.trim(), // Using same input field for package ID
+          micrositeId: selectedMicrosite === "auto" ? null : selectedMicrosite,
+        }
+
+        console.log("📤 Sending holiday package request:", requestData)
+
+        // Import from Travel Compositor using new API
+        const response = await fetch("/api/import-holiday-package", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestData),
+        })
+
+        console.log("📥 Holiday package response status:", response.status)
+
+        const data = await response.json()
+        console.log("📥 Holiday package response data:", data)
+
+        if (!response.ok) {
+          throw new Error(data.error || "Holiday package import failed")
+        }
+
+        // Show success message
+        setImportSuccess(`✅ Holiday Package ${bookingId} succesvol geïmporteerd!`)
+
+        // Save holiday package data to localStorage for the package-werkblad
+        try {
+          const packageDataString = JSON.stringify(data.package)
+          localStorage.setItem("importedHolidayPackage", packageDataString)
+          console.log("💾 Saved holiday package to localStorage:", packageDataString)
+        } catch (error) {
+          console.error("❌ Failed to save holiday package to localStorage:", error)
+        }
+
+        // Redirect to package-werkblad after a short delay
+        setTimeout(() => {
+          window.location.href = "/package-werkblad"
+        }, 2000)
       } else if (selectedImportType === "manual-input") {
         // For manual input, redirect to intake preview
         window.location.href = "/intake-preview"
@@ -456,7 +501,7 @@ export default function ImportPage() {
                                   ? "Bijv. RRP-9488, RRP-9487, RRP-9486 (recent bookings)"
                                   : travelCompositorType === "travel-idea"
                                     ? "Bijv. IDEA123456, 12345 (travel idea ID)"
-                                    : "Bijv. PKG123456"
+                                    : "Bijv. PKG123456, HOLIDAY-001 (holiday package ID)"
                               }
                               className="text-lg py-3"
                             />
@@ -465,7 +510,8 @@ export default function ImportPage() {
                                 "Voer je Travel Compositor booking ID of RRP nummer in"}
                               {travelCompositorType === "travel-idea" &&
                                 "Voer je Travel Idea ID in voor reis inspiratie"}
-                              {travelCompositorType === "holiday-package" && "Voer je Holiday Package ID in"}
+                              {travelCompositorType === "holiday-package" &&
+                                "Voer je Holiday Package ID in voor vakantie pakketten"}
                             </p>
                           </div>
 
