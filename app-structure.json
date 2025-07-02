@@ -1,0 +1,39 @@
+{
+  "app_name": "Reis Assistent",
+  "app_type": "Progressive Web App",
+  "data_source": "Google Sheets",
+  "screens": [
+    {
+      "name": "Welcome Screen",
+      "type": "onboarding",
+      "components": ["hero_image", "title", "description", "get_started_button"]
+    },
+    {
+      "name": "Document Upload",
+      "type": "form",
+      "components": ["file_picker", "url_input", "uploaded_files_list", "next_button"]
+    },
+    {
+      "name": "Intake Form",
+      "type": "multi_step_form",
+      "components": [
+        "text_input_naam",
+        "choice_kinderen",
+        "checkbox_interesses",
+        "choice_budget",
+        "text_area_bijzonderheden",
+        "submit_button"
+      ]
+    },
+    {
+      "name": "Chat Interface",
+      "type": "chat",
+      "components": ["chat_messages", "text_input_message", "voice_input_button", "send_button"]
+    },
+    {
+      "name": "Profile",
+      "type": "detail",
+      "components": ["user_info", "uploaded_documents", "chat_history", "edit_preferences"]
+    }
+  ]
+}

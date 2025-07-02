@@ -1,0 +1,240 @@
+# Glide App Configuration
+app_settings:
+  name: "Reis Assistent"
+  icon: "✈️"
+  theme_color: "#3B82F6"
+  privacy: "Public with Email"
+  
+data_sources:
+  - name: "Users"
+    type: "Google Sheets"
+    sheet_id: "your_sheet_id"
+    tab: "Users"
+    
+  - name: "Documents" 
+    type: "Google Sheets"
+    sheet_id: "your_sheet_id"
+    tab: "Documents"
+    
+  - name: "Chat_History"
+    type: "Google Sheets" 
+    sheet_id: "your_sheet_id"
+    tab: "Chat_History"
+
+screens:
+  welcome:
+    layout: "Cover"
+    background_image: "/placeholder.svg?height=400&width=800"
+    title: "Jouw Persoonlijke Reis Assistent"
+    subtitle: "Upload je reisdocumenten en krijg AI-powered reisadvies"
+    action_button:
+      text: "Start Nu"
+      action: "Go to screen -> Document Upload"
+      
+  document_upload:
+    layout: "Form"
+    title: "📄 Upload Documenten"
+    components:
+      - type: "File Picker"
+        label: "Bevestiging PDF"
+        accept: ".pdf,.doc,.docx"
+        required: true
+        
+      - type: "Text Input"
+        label: "Hotel Website URL"
+        placeholder: "https://hotel-website.com"
+        
+      - type: "Text Input" 
+        label: "Activiteiten Website URL"
+        placeholder: "https://activiteiten-site.com"
+        
+      - type: "Rich Text"
+        content: "Sleep je bevestiging PDF hierheen en voeg relevante websites toe."
+        
+    actions:
+      - text: "Volgende: Voorkeuren"
+        action: "Go to screen -> Intake Form"
+        condition: "File Picker is not empty"
+
+  intake_form:
+    layout: "Form"
+    title: "✈️ Vertel over je reis"
+    components:
+      - type: "Text Input"
+        label: "Naam"
+        column: "Naam"
+        required: true
+        
+      - type: "Text Input"
+        label: "Met wie ga je op reis?"
+        column: "Reisgenoten"
+        placeholder: "Partner, vrienden, familie..."
+        
+      - type: "Choice"
+        label: "Gaan er kinderen mee?"
+        column: "Kinderen_Mee"
+        options: ["Ja", "Nee"]
+        style: "Radio"
+        
+      - type: "Number Input"
+        label: "Hoeveel kinderen?"
+        column: "Kinderen_Aantal"
+        condition: "Kinderen_Mee = Ja"
+        
+      - type: "Text Input"
+        label: "Leeftijden kinderen"
+        column: "Kinderen_Leeftijden" 
+        placeholder: "8, 12, 15 jaar"
+        condition: "Kinderen_Mee = Ja"
+        
+      - type: "Text Area"
+        label: "Hobby's kinderen"
+        column: "Kinderen_Hobbys"
+        condition: "Kinderen_Mee = Ja"
+        
+      - type: "Multiple Choice"
+        label: "Wat vind je interessant?"
+        column: "Interesses"
+        options: 
+          - "Cultuur & Geschiedenis"
+          - "Natuur & Landschappen" 
+          - "Avontuur & Sport"
+          - "Eten & Drinken"
+          - "Winkelen"
+          - "Nachtleven"
+          - "Musea & Kunst"
+          - "Architectuur"
+        style: "Checkbox"
+        
+      - type: "Choice"
+        label: "Budget per persoon per dag"
+        column: "Budget"
+        options: 
+          - "Budget (€50-100)"
+          - "Middenklasse (€100-200)" 
+          - "Luxe (€200+)"
+        style: "Radio"
+        
+      - type: "Choice"
+        label: "Reisstijl"
+        column: "Reisstijl"
+        options:
+          - "Avontuurlijk en actief"
+          - "Ontspannen en rustig"
+          - "Cultureel en educatief"
+          - "Mix van alles"
+        style: "Radio"
+        
+      - type: "Text Input"
+        label: "Allergieën of dieetwensen"
+        column: "Allergien"
+        placeholder: "Vegetarisch, noten allergie, etc."
+        
+      - type: "Text Area"
+        label: "Andere bijzonderheden"
+        column: "Bijzonderheden"
+        placeholder: "Alles wat je nog wilt delen..."
+        
+    actions:
+      - text: "Start Chat"
+        action: "Go to screen -> Chat"
+        submit_form: true
+
+  chat:
+    layout: "Chat"
+    title: "🤖 Reis Assistent"
+    data_source: "Chat_History"
+    filter: "User_Email = User Profile -> Email"
+    
+    ai_integration:
+      provider: "OpenAI"
+      model: "gpt-4"
+      system_prompt: |
+        Je bent een persoonlijke reis-assistent. 
+        
+        Gebruiker informatie:
+        - Naam: {User Profile -> Naam}
+        - Reisgenoten: {User Profile -> Reisgenoten}  
+        - Kinderen: {User Profile -> Kinderen_Mee}
+        - Interesses: {User Profile -> Interesses}
+        - Budget: {User Profile -> Budget}
+        - Reisstijl: {User Profile -> Reisstijl}
+        
+        Geef persoonlijke reisadviezen in het Nederlands.
+        
+    components:
+      - type: "Chat Messages"
+        user_column: "Role"
+        message_column: "Message"
+        timestamp_column: "Timestamp"
+        
+      - type: "Text Input"
+        placeholder: "Stel een vraag over je reis..."
+        action: "Add row to Chat_History"
+        
+      - type: "Voice Input"
+        language: "nl-NL"
+        
+    actions:
+      - text: "Profiel Bewerken"
+        action: "Go to screen -> Profile"
+
+  profile:
+    layout: "Details"
+    title: "👤 Mijn Profiel"
+    data_source: "Users"
+    filter: "Email = User Profile -> Email"
+    
+    components:
+      - type: "Text"
+        label: "Naam"
+        value: "{Naam}"
+        
+      - type: "Text"
+        label: "Reisgenoten"
+        value: "{Reisgenoten}"
+        
+      - type: "Text"
+        label: "Interesses"
+        value: "{Interesses}"
+        
+      - type: "Relation"
+        label: "Mijn Documenten"
+        relation: "Documents"
+        display: "Document_Name"
+        
+    actions:
+      - text: "Bewerk Voorkeuren"
+        action: "Go to screen -> Intake Form"
+        
+      - text: "Terug naar Chat"
+        action: "Go to screen -> Chat"
+
+navigation:
+  style: "Tabs"
+  tabs:
+    - name: "Chat"
+      icon: "💬"
+      screen: "chat"
+      
+    - name: "Documenten"
+      icon: "📄" 
+      screen: "document_upload"
+      
+    - name: "Profiel"
+      icon: "👤"
+      screen: "profile"
+
+integrations:
+  openai:
+    api_key: "your_openai_api_key"
+    model: "gpt-4"
+    max_tokens: 500
+    
+  google_drive:
+    enabled: true
+    folder: "Travel Assistant Uploads"
+    
+  speech_to_text:
+    enabled: true
+    language: "nl-NL"

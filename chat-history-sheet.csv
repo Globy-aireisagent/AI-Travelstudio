@@ -1,0 +1,3 @@
+User_Email,Message_ID,Role,Message,Timestamp,AI_Model
+user@example.com,1,user,Wat zijn de beste restaurants in Bangkok?,2024-01-15 14:30,
+user@example.com,2,assistant,"Op basis van je voorkeuren voor cultuur en je budget, raad ik deze restaurants aan in Bangkok: 1. Gaggan (fine dining)...",2024-01-15 14:31,gpt-4

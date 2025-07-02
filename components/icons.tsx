@@ -1,0 +1,358 @@
+import {
+  type LightbulbIcon as LucideProps,
+  Moon,
+  SunMedium,
+  Twitter,
+  type LucideIcon,
+  Plane,
+  MapPin,
+  Calendar,
+  Users,
+  Settings,
+  BarChart3,
+  MessageSquare,
+  Bot,
+  Route,
+  Hotel,
+  ImageIcon,
+  FileText,
+  Briefcase,
+  Smile,
+  Sparkles,
+  Plus,
+  Trash2,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Mic,
+  MicOff,
+  Send,
+  User,
+  Menu,
+  Home,
+  Database,
+  Shield,
+  Zap,
+  Globe,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  Eye,
+  Edit,
+  Save,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  Star,
+  Heart,
+  Share,
+  Bell,
+  Mail,
+  Phone,
+  Clock,
+  Camera,
+  Video,
+  Music,
+  Play,
+  Pause,
+  CircleStopIcon as Stop,
+  SkipForward,
+  SkipBack,
+  Volume2,
+  VolumeX,
+  Wifi,
+  WifiOff,
+  Battery,
+  BatteryLow,
+  Signal,
+  Bluetooth,
+  Usb,
+  HardDrive,
+  Cpu,
+  Monitor,
+  Smartphone,
+  Tablet,
+  Laptop,
+  ComputerIcon as Desktop,
+  Server,
+  Cloud,
+  CloudOff,
+  Lock,
+  Unlock,
+  Key,
+  ShieldCheck,
+  AlertTriangle,
+  HelpCircle,
+  Lightbulb,
+  Target,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  PieChart,
+  BarChart,
+  LineChart,
+  DollarSign,
+  CreditCard,
+  Wallet,
+  ShoppingCart,
+  ShoppingBag,
+  Package,
+  Truck,
+  Car,
+  Bus,
+  Train,
+  Ship,
+  Navigation,
+  Compass,
+  Map,
+  Flag,
+  Bookmark,
+  Tag,
+  Tags,
+  Folder,
+  FolderOpen,
+  File,
+  FileImage,
+  FileVideo,
+  FileAudio,
+  Archive,
+  Paperclip,
+  Link,
+  ExternalLink,
+  ArrowRight,
+  ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  RotateCcw,
+  RotateCw,
+  Maximize,
+  Minimize,
+  ZoomIn,
+  ZoomOut,
+  Move,
+  ScalingIcon as Resize,
+  Layers,
+  Grid,
+  List,
+  Layout,
+  Sidebar,
+  PanelLeft,
+  PanelRight,
+  MoreHorizontal,
+  MoreVertical,
+} from "lucide-react"
+
+export type Icon = LucideIcon
+
+export const Icons = {
+  sun: SunMedium,
+  moon: Moon,
+  twitter: Twitter,
+
+  // Travel specific
+  plane: Plane,
+  mapPin: MapPin,
+  calendar: Calendar,
+  users: Users,
+  route: Route,
+  hotel: Hotel,
+
+  // UI
+  settings: Settings,
+  barChart: BarChart3,
+  messageSquare: MessageSquare,
+  bot: Bot,
+  image: ImageIcon,
+  fileText: FileText,
+  briefcase: Briefcase,
+  smile: Smile,
+  sparkles: Sparkles,
+  plus: Plus,
+  trash: Trash2,
+  x: X,
+  chevronDown: ChevronDown,
+  chevronUp: ChevronUp,
+  copy: Copy,
+  mic: Mic,
+  micOff: MicOff,
+  send: Send,
+  user: User,
+  menu: Menu,
+  home: Home,
+  database: Database,
+  shield: Shield,
+  zap: Zap,
+  globe: Globe,
+  search: Search,
+  filter: Filter,
+  download: Download,
+  upload: Upload,
+  eye: Eye,
+  edit: Edit,
+  save: Save,
+  refresh: RefreshCw,
+
+  // Status
+  alertCircle: AlertCircle,
+  checkCircle: CheckCircle,
+  info: Info,
+  star: Star,
+  heart: Heart,
+  share: Share,
+  bell: Bell,
+  mail: Mail,
+  phone: Phone,
+  clock: Clock,
+
+  // Media
+  camera: Camera,
+  video: Video,
+  music: Music,
+  play: Play,
+  pause: Pause,
+  stop: Stop,
+  skipForward: SkipForward,
+  skipBack: SkipBack,
+  volume: Volume2,
+  volumeOff: VolumeX,
+
+  // Tech
+  wifi: Wifi,
+  wifiOff: WifiOff,
+  battery: Battery,
+  batteryLow: BatteryLow,
+  signal: Signal,
+  bluetooth: Bluetooth,
+  usb: Usb,
+  hardDrive: HardDrive,
+  cpu: Cpu,
+  monitor: Monitor,
+  smartphone: Smartphone,
+  tablet: Tablet,
+  laptop: Laptop,
+  desktop: Desktop,
+  server: Server,
+  cloud: Cloud,
+  cloudOff: CloudOff,
+
+  // Security
+  lock: Lock,
+  unlock: Unlock,
+  key: Key,
+  shieldCheck: ShieldCheck,
+  alertTriangle: AlertTriangle,
+
+  // Help
+  helpCircle: HelpCircle,
+  lightbulb: Lightbulb,
+  target: Target,
+
+  // Charts
+  trendingUp: TrendingUp,
+  trendingDown: TrendingDown,
+  activity: Activity,
+  pieChart: PieChart,
+  barChart: BarChart,
+  lineChart: LineChart,
+
+  // Commerce
+  dollarSign: DollarSign,
+  creditCard: CreditCard,
+  wallet: Wallet,
+  shoppingCart: ShoppingCart,
+  shoppingBag: ShoppingBag,
+  package: Package,
+
+  // Transport
+  truck: Truck,
+  car: Car,
+  bus: Bus,
+  train: Train,
+  ship: Ship,
+
+  // Navigation
+  navigation: Navigation,
+  compass: Compass,
+  map: Map,
+  flag: Flag,
+  bookmark: Bookmark,
+
+  // Organization
+  tag: Tag,
+  tags: Tags,
+  folder: Folder,
+  folderOpen: FolderOpen,
+  file: File,
+  fileImage: FileImage,
+  fileVideo: FileVideo,
+  fileAudio: FileAudio,
+  archive: Archive,
+  paperclip: Paperclip,
+  link: Link,
+  externalLink: ExternalLink,
+
+  // Arrows
+  arrowRight: ArrowRight,
+  arrowLeft: ArrowLeft,
+  arrowUp: ArrowUp,
+  arrowDown: ArrowDown,
+  rotateCcw: RotateCcw,
+  rotateCw: RotateCw,
+
+  // Layout
+  maximize: Maximize,
+  minimize: Minimize,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  move: Move,
+  resize: Resize,
+  layers: Layers,
+  grid: Grid,
+  list: List,
+  layout: Layout,
+  sidebar: Sidebar,
+  panelLeft: PanelLeft,
+  panelRight: PanelRight,
+  moreHorizontal: MoreHorizontal,
+  moreVertical: MoreVertical,
+
+  // Custom logo placeholder
+  logo: ({ ...props }: LucideProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5" />
+      <path d="M2 12l10 5 10-5" />
+    </svg>
+  ),
+
+  // Spinner
+  spinner: ({ ...props }: LucideProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="animate-spin"
+      {...props}
+    >
+      <path d="M21 12a9 9 0 11-6.219-8.56" />
+    </svg>
+  ),
+}
