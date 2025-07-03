@@ -10,9 +10,6 @@ export async function POST(request: NextRequest) {
     // Importeer alle data
     const importResult = await userManager.importAllData()
 
-    // Sla data op in onze database (hier zou je naar Supabase kunnen schrijven)
-    // Voor nu returnen we de data
-
     return NextResponse.json({
       success: true,
       message: "Travel Compositor import completed successfully",
@@ -36,6 +33,8 @@ export async function POST(request: NextRequest) {
             bookingsCount: user.bookings.length,
             ideasCount: user.ideas.length,
             lastLogin: user.lastLogin,
+            bookings: user.bookings,
+            ideas: user.ideas,
           })),
         })),
       },

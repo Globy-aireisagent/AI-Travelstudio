@@ -255,36 +255,38 @@ export class TravelCompositorUserManager {
     return await response.json()
   }
 
-  // Haal credit balance op voor agency
-  async getAgencyCreditBalance(micrositeId: string, agencyId: string): Promise<number> {
-    const token = await this.authenticate(micrositeId)
-
-    const response = await fetch(`${this.baseUrl}/resources/agency/credit/${micrositeId}/${agencyId}`, {
-      headers: {
-        "auth-token": token,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-    })
-
-    if (!response.ok) return 0
-
-    const data = await response.json()
-    return data.creditBalance || 0
-  }
-
   // Haal bookings op voor specifieke user (via email)
   async getUserBookings(micrositeId: string, userEmail: string): Promise<any[]> {
     try {
-      // Gebruik onze bestaande booking API
-      const response = await fetch(
-        `/api/travel-compositor/booking-super-fast?config=${micrositeId}&clientEmail=${encodeURIComponent(userEmail)}`,
-      )
+      const token = await this.authenticate(micrositeId)
 
-      if (!response.ok) return []
+      // Probeer verschillende booking endpoints
+      const endpoints = [
+        `/resources/booking/${micrositeId}?clientEmail=${encodeURIComponent(userEmail)}`,
+        `/resources/booking/${micrositeId}?email=${encodeURIComponent(userEmail)}`,
+        `/resources/booking/${micrositeId}?client=${encodeURIComponent(userEmail)}`,
+      ]
 
-      const data = await response.json()
-      return data.bookings || []
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            headers: {
+              "auth-token": token,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            return data.booking || data.bookings || []
+          }
+        } catch (error) {
+          console.log(`⚠️ Booking endpoint ${endpoint} failed:`, error)
+        }
+      }
+
+      return []
     } catch (error) {
       console.log(`⚠️ Could not fetch bookings for user ${userEmail}:`, error)
       return []
@@ -294,107 +296,39 @@ export class TravelCompositorUserManager {
   // Haal ideas op voor specifieke user
   async getUserIdeas(micrositeId: string, userEmail: string): Promise<any[]> {
     try {
-      // Gebruik onze bestaande ideas API
-      const response = await fetch(`/api/travel-compositor/idea-lightning-fast`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          micrositeConfig: micrositeId,
-          clientEmail: userEmail,
-        }),
-      })
+      const token = await this.authenticate(micrositeId)
 
-      if (!response.ok) return []
+      // Probeer verschillende idea endpoints
+      const endpoints = [
+        `/resources/travelideas/${micrositeId}?clientEmail=${encodeURIComponent(userEmail)}`,
+        `/resources/ideas/${micrositeId}?email=${encodeURIComponent(userEmail)}`,
+        `/resources/travelidea/${micrositeId}?client=${encodeURIComponent(userEmail)}`,
+      ]
 
-      const data = await response.json()
-      return data.ideas || []
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            headers: {
+              "auth-token": token,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            return data.travelIdea || data.ideas || data.travelideas || []
+          }
+        } catch (error) {
+          console.log(`⚠️ Ideas endpoint ${endpoint} failed:`, error)
+        }
+      }
+
+      return []
     } catch (error) {
       console.log(`⚠️ Could not fetch ideas for user ${userEmail}:`, error)
       return []
     }
-  }
-
-  // Maak nieuwe user aan
-  async createUser(
-    micrositeId: string,
-    agencyId: string,
-    userData: {
-      username: string
-      email: string
-      firstName: string
-      lastName: string
-      password: string
-      role?: string
-    },
-  ): Promise<TravelCompositorUser | null> {
-    const token = await this.authenticate(micrositeId)
-
-    const response = await fetch(`${this.baseUrl}/resources/user/${micrositeId}/${agencyId}/create`, {
-      method: "POST",
-      headers: {
-        "auth-token": token,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(userData),
-    })
-
-    if (!response.ok) {
-      console.error(`❌ Failed to create user: ${response.status}`)
-      return null
-    }
-
-    const newUser = await response.json()
-
-    return {
-      id: newUser.id,
-      username: newUser.username,
-      email: newUser.email,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      agencyId,
-      micrositeId,
-      status: "active",
-      role: userData.role || "agent",
-      lastLogin: "",
-      createdDate: new Date().toISOString(),
-      permissions: [],
-      bookings: [],
-      ideas: [],
-    }
-  }
-
-  // Update user
-  async updateUser(micrositeId: string, agencyId: string, username: string, updates: any): Promise<boolean> {
-    const token = await this.authenticate(micrositeId)
-
-    const response = await fetch(`${this.baseUrl}/resources/user/${micrositeId}/${agencyId}/${username}`, {
-      method: "PUT",
-      headers: {
-        "auth-token": token,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(updates),
-    })
-
-    return response.ok
-  }
-
-  // Deactiveer user
-  async deactivateUser(micrositeId: string, agencyId: string, username: string): Promise<boolean> {
-    const token = await this.authenticate(micrositeId)
-
-    const response = await fetch(`${this.baseUrl}/resources/user/${micrositeId}/${agencyId}/${username}/deactivate`, {
-      method: "POST",
-      headers: {
-        "auth-token": token,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-    })
-
-    return response.ok
   }
 
   // Importeer alle data van alle microsites
