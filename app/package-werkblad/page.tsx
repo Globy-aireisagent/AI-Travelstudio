@@ -110,6 +110,7 @@ interface HolidayPackage {
     website: string
   }
   searchMethod?: string
+  micrositeId?: string
 }
 
 // Image Slideshow Component
@@ -276,6 +277,7 @@ export default function PackageWerkbladPage() {
               website: "",
             },
             searchMethod: packageData.searchMethod || "Unknown",
+            micrositeId: packageData.micrositeId || "Unknown",
           }
 
           // Ensure booking conditions arrays are safe
@@ -417,7 +419,7 @@ export default function PackageWerkbladPage() {
                 <div className="flex items-center space-x-4 text-orange-100">
                   <div className="flex items-center">
                     <MapPin className="h-4 w-4 mr-1" />
-                    {holidayPackage.destinations.length} bestemmingen
+                    {holidayPackage.destinations?.length || 0} bestemmingen
                   </div>
                   <div className="flex items-center">
                     <Clock className="h-4 w-4 mr-1" />
@@ -431,13 +433,13 @@ export default function PackageWerkbladPage() {
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold">{formatPrice(holidayPackage.totalPrice)}</div>
-                {holidayPackage.pricePerPerson.amount > 0 && (
+                {holidayPackage.pricePerPerson?.amount > 0 && (
                   <div className="text-sm text-orange-100">
                     {formatPrice(holidayPackage.pricePerPerson)} per persoon
                   </div>
                 )}
                 <div className="flex items-center mt-2">
-                  {holidayPackage.availability.available ? (
+                  {holidayPackage.availability?.available ? (
                     <Badge className="bg-green-500/20 text-green-100">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Beschikbaar
@@ -473,7 +475,7 @@ export default function PackageWerkbladPage() {
             )}
 
             {/* Themes */}
-            {holidayPackage.themes.length > 0 && (
+            {holidayPackage.themes?.length > 0 && (
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-700 mb-2">Thema's</h3>
                 <div className="flex flex-wrap gap-2">
@@ -487,7 +489,7 @@ export default function PackageWerkbladPage() {
             )}
 
             {/* Destinations */}
-            {holidayPackage.destinations.length > 0 && (
+            {holidayPackage.destinations?.length > 0 && (
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-700 mb-2">Bestemmingen</h3>
                 <div className="flex flex-wrap gap-2">
@@ -505,17 +507,17 @@ export default function PackageWerkbladPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <Hotel className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-blue-600">{holidayPackage.accommodations.length}</div>
+                <div className="text-2xl font-bold text-blue-600">{holidayPackage.accommodations?.length || 0}</div>
                 <div className="text-sm text-gray-600">Accommodaties</div>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <Plane className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-green-600">{holidayPackage.transports.length}</div>
+                <div className="text-2xl font-bold text-green-600">{holidayPackage.transports?.length || 0}</div>
                 <div className="text-sm text-gray-600">Transport</div>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <Camera className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-purple-600">{holidayPackage.activities.length}</div>
+                <div className="text-2xl font-bold text-purple-600">{holidayPackage.activities?.length || 0}</div>
                 <div className="text-sm text-gray-600">Activiteiten</div>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
@@ -537,17 +539,17 @@ export default function PackageWerkbladPage() {
             <TabsTrigger value="accommodations" className="flex flex-col items-center space-y-1 p-3">
               <Hotel className="h-4 w-4" />
               <span className="text-xs">Accommodaties</span>
-              <span className="text-xs text-gray-500">({holidayPackage.accommodations.length})</span>
+              <span className="text-xs text-gray-500">({holidayPackage.accommodations?.length || 0})</span>
             </TabsTrigger>
             <TabsTrigger value="transport" className="flex flex-col items-center space-y-1 p-3">
               <Plane className="h-4 w-4" />
               <span className="text-xs">Transport</span>
-              <span className="text-xs text-gray-500">({holidayPackage.transports.length})</span>
+              <span className="text-xs text-gray-500">({holidayPackage.transports?.length || 0})</span>
             </TabsTrigger>
             <TabsTrigger value="activities" className="flex flex-col items-center space-y-1 p-3">
               <Camera className="h-4 w-4" />
               <span className="text-xs">Activiteiten</span>
-              <span className="text-xs text-gray-500">({holidayPackage.activities.length})</span>
+              <span className="text-xs text-gray-500">({holidayPackage.activities?.length || 0})</span>
             </TabsTrigger>
             <TabsTrigger value="inclusions" className="flex flex-col items-center space-y-1 p-3">
               <CheckCircle className="h-4 w-4" />
@@ -561,7 +563,7 @@ export default function PackageWerkbladPage() {
 
           {/* Itinerary Tab */}
           <TabsContent value="itinerary" className="space-y-4">
-            {holidayPackage.itinerary.length > 0 ? (
+            {holidayPackage.itinerary?.length > 0 ? (
               holidayPackage.itinerary.map((day, index) => (
                 <Card key={index} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                   <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white">
@@ -574,7 +576,7 @@ export default function PackageWerkbladPage() {
                     <div className="space-y-4">
                       <p className="text-gray-600">{day.description}</p>
 
-                      {day.activities.length > 0 && (
+                      {day.activities?.length > 0 && (
                         <div>
                           <h4 className="font-semibold text-gray-700 mb-2">Activiteiten</h4>
                           <ul className="list-disc list-inside space-y-1">
@@ -593,7 +595,7 @@ export default function PackageWerkbladPage() {
                             <strong>Accommodatie:</strong> {day.accommodation}
                           </div>
                         )}
-                        {day.meals.length > 0 && (
+                        {day.meals?.length > 0 && (
                           <div>
                             <strong>Maaltijden:</strong> {day.meals.join(", ")}
                           </div>
@@ -615,7 +617,7 @@ export default function PackageWerkbladPage() {
 
           {/* Accommodations Tab */}
           <TabsContent value="accommodations" className="space-y-4">
-            {holidayPackage.accommodations.length > 0 ? (
+            {holidayPackage.accommodations?.length > 0 ? (
               holidayPackage.accommodations.map((accommodation, index) => (
                 <Card key={index} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                   <CardContent className="p-6">
@@ -643,7 +645,7 @@ export default function PackageWerkbladPage() {
                           <p className="text-gray-600 mb-4 text-sm">{accommodation.description}</p>
                         )}
 
-                        {accommodation.amenities.length > 0 && (
+                        {accommodation.amenities?.length > 0 && (
                           <div>
                             <h4 className="font-semibold text-gray-700 mb-2">Faciliteiten</h4>
                             <div className="flex flex-wrap gap-1">
@@ -672,7 +674,7 @@ export default function PackageWerkbladPage() {
 
           {/* Transport Tab */}
           <TabsContent value="transport" className="space-y-4">
-            {holidayPackage.transports.length > 0 ? (
+            {holidayPackage.transports?.length > 0 ? (
               holidayPackage.transports.map((transport, index) => (
                 <Card key={index} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                   <CardContent className="p-6">
@@ -716,7 +718,7 @@ export default function PackageWerkbladPage() {
 
           {/* Activities Tab */}
           <TabsContent value="activities" className="space-y-4">
-            {holidayPackage.activities.length > 0 ? (
+            {holidayPackage.activities?.length > 0 ? (
               holidayPackage.activities.map((activity, index) => (
                 <Card key={index} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                   <CardContent className="p-6">
@@ -783,7 +785,7 @@ export default function PackageWerkbladPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
-                  {holidayPackage.inclusions.length > 0 ? (
+                  {holidayPackage.inclusions?.length > 0 ? (
                     <ul className="space-y-2">
                       {holidayPackage.inclusions.map((inclusion, index) => (
                         <li key={index} className="flex items-start">
@@ -807,7 +809,7 @@ export default function PackageWerkbladPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
-                  {holidayPackage.exclusions.length > 0 ? (
+                  {holidayPackage.exclusions?.length > 0 ? (
                     <ul className="space-y-2">
                       {holidayPackage.exclusions.map((exclusion, index) => (
                         <li key={index} className="flex items-start">
@@ -838,21 +840,21 @@ export default function PackageWerkbladPage() {
                 <CardContent className="p-6 space-y-4">
                   <div>
                     <h4 className="font-semibold text-gray-700 mb-2">Annuleringsbeleid</h4>
-                    <p className="text-sm text-gray-600">{holidayPackage.bookingConditions.cancellationPolicy}</p>
+                    <p className="text-sm text-gray-600">{holidayPackage.bookingConditions?.cancellationPolicy}</p>
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-700 mb-2">Betalingsvoorwaarden</h4>
-                    <p className="text-sm text-gray-600">{holidayPackage.bookingConditions.paymentTerms}</p>
+                    <p className="text-sm text-gray-600">{holidayPackage.bookingConditions?.paymentTerms}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <strong>Min. leeftijd:</strong> {holidayPackage.bookingConditions.minimumAge} jaar
+                      <strong>Min. leeftijd:</strong> {holidayPackage.bookingConditions?.minimumAge} jaar
                     </div>
                     <div>
-                      <strong>Max. groepsgrootte:</strong> {holidayPackage.bookingConditions.maximumGroupSize}
+                      <strong>Max. groepsgrootte:</strong> {holidayPackage.bookingConditions?.maximumGroupSize}
                     </div>
                   </div>
-                  {holidayPackage.bookingConditions.requiredDocuments.length > 0 && (
+                  {holidayPackage.bookingConditions?.requiredDocuments?.length > 0 && (
                     <div>
                       <h4 className="font-semibold text-gray-700 mb-2">Vereiste documenten</h4>
                       <ul className="list-disc list-inside space-y-1">
@@ -878,21 +880,21 @@ export default function PackageWerkbladPage() {
                 <CardContent className="p-6 space-y-4">
                   <div>
                     <h4 className="font-semibold text-gray-700 mb-2">Tour Operator</h4>
-                    <p className="text-sm text-gray-600">{holidayPackage.contact.tourOperator}</p>
+                    <p className="text-sm text-gray-600">{holidayPackage.contact?.tourOperator}</p>
                   </div>
-                  {holidayPackage.contact.phone && (
+                  {holidayPackage.contact?.phone && (
                     <div className="flex items-center">
                       <Phone className="h-4 w-4 text-gray-500 mr-2" />
                       <span className="text-sm text-gray-600">{holidayPackage.contact.phone}</span>
                     </div>
                   )}
-                  {holidayPackage.contact.email && (
+                  {holidayPackage.contact?.email && (
                     <div className="flex items-center">
                       <Mail className="h-4 w-4 text-gray-500 mr-2" />
                       <span className="text-sm text-gray-600">{holidayPackage.contact.email}</span>
                     </div>
                   )}
-                  {holidayPackage.contact.website && (
+                  {holidayPackage.contact?.website && (
                     <div className="flex items-center">
                       <Globe className="h-4 w-4 text-gray-500 mr-2" />
                       <a
@@ -911,7 +913,7 @@ export default function PackageWerkbladPage() {
                     <h4 className="font-semibold text-gray-700 mb-2">Beschikbaarheid</h4>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        {holidayPackage.availability.available ? (
+                        {holidayPackage.availability?.available ? (
                           <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
                         ) : (
                           <XCircle className="h-4 w-4 text-red-600 mr-2" />
@@ -920,7 +922,7 @@ export default function PackageWerkbladPage() {
                           {holidayPackage.availability.available ? "Beschikbaar" : "Niet beschikbaar"}
                         </span>
                       </div>
-                      {holidayPackage.availability.spotsLeft > 0 && (
+                      {holidayPackage.availability?.spotsLeft > 0 && (
                         <Badge variant="outline">{holidayPackage.availability.spotsLeft} plekken over</Badge>
                       )}
                     </div>

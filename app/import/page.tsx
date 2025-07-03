@@ -1,12 +1,26 @@
 "use client"
 import Link from "next/link"
+import { SelectItem } from "@/components/ui/select"
+
+import { SelectContent } from "@/components/ui/select"
+
+import { SelectValue } from "@/components/ui/select"
+
+import { SelectTrigger } from "@/components/ui/select"
+
+import { Select } from "@/components/ui/select"
+
+import { Label } from "@/components/ui/label"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Home, Upload, Globe, FileText, Edit, CheckCircle, Loader2, AlertCircle } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { toast } from "@/hooks/use-toast"
 
 interface Microsite {
   id: string
@@ -21,6 +35,11 @@ export default function ImportPage() {
   const [isImporting, setIsImporting] = useState(false)
   const [importError, setImportError] = useState<string>("")
   const [importSuccess, setImportSuccess] = useState<string>("")
+  const [packageId, setPackageId] = useState("")
+  const [micrositeId, setMicrositeId] = useState("auto")
+  const [importType, setImportType] = useState("booking")
+  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
   // Form states
   const [bookingId, setBookingId] = useState("")
@@ -264,6 +283,75 @@ export default function ImportPage() {
       setImportError(error instanceof Error ? error.message : "Er is een onbekende fout opgetreden")
     } finally {
       setIsImporting(false)
+    }
+  }
+
+  const handleTravelCompositorImport = async () => {
+    setIsLoading(true)
+    try {
+      let apiUrl = ""
+      const body = { packageId, micrositeId }
+
+      if (importType === "booking") {
+        apiUrl = "/api/import-booking"
+      } else if (importType === "travel-idea") {
+        apiUrl = "/api/import-travel-idea"
+      } else if (importType === "holiday-package") {
+        apiUrl = "/api/import-holiday-package"
+      } else {
+        toast({
+          title: "Ongeldig import type",
+          description: "Selecteer een geldig import type.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        console.log("✅ Import succesvol:", data)
+
+        if (importType === "booking") {
+          localStorage.setItem("importedBookingData", JSON.stringify(data.data))
+          router.push("/werkblad")
+        } else if (importType === "travel-idea") {
+          localStorage.setItem("importedTravelIdea", JSON.stringify(data.data))
+          router.push("/travelwerkblad")
+        } else if (importType === "holiday-package") {
+          localStorage.setItem("importedHolidayPackage", JSON.stringify(data.data))
+          router.push("/package-werkblad")
+        }
+
+        toast({
+          title: "Import succesvol",
+          description: data.message || "Data succesvol geïmporteerd.",
+        })
+      } else {
+        console.error("❌ Import mislukt:", data)
+        toast({
+          title: "Import mislukt",
+          description: data.error || "Er is een fout opgetreden tijdens de import.",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      console.error("❌ Import error:", error)
+      toast({
+        title: "Import error",
+        description: error.message || "Er is een onverwachte fout opgetreden.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -628,6 +716,58 @@ export default function ImportPage() {
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Travel Compositor Import Form */}
+          {selectedImportType === "travel-compositor" && (
+            <Card className="w-full max-w-md mt-8">
+              <CardHeader>
+                <CardTitle>Travel Compositor Data Import</CardTitle>
+                <CardDescription>Importeer data van Travel Compositor naar het werkblad.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="importType">Import Type</Label>
+                  <Select onValueChange={(value) => setImportType(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecteer een type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="booking">Booking</SelectItem>
+                      <SelectItem value="travel-idea">Travel Idea</SelectItem>
+                      <SelectItem value="holiday-package">Holiday Package</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="packageId">Package ID</Label>
+                  <Input
+                    id="packageId"
+                    value={packageId}
+                    onChange={(e) => setPackageId(e.target.value)}
+                    placeholder="Voer package ID in"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="micrositeId">Microsite ID (Optioneel)</Label>
+                  <Select onValueChange={(value) => setMicrositeId(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Auto Detect" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto Detect</SelectItem>
+                      <SelectItem value="1">Rondreis-planner</SelectItem>
+                      <SelectItem value="2">Reisbureaunederland</SelectItem>
+                      <SelectItem value="3">Microsite 3</SelectItem>
+                      <SelectItem value="4">Microsite 4</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={handleTravelCompositorImport} className="bg-blue-500 text-white" disabled={isLoading}>
+                  {isLoading ? "Importeren..." : "Importeer Data"}
+                </Button>
               </CardContent>
             </Card>
           )}
