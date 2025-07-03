@@ -1,293 +1,192 @@
+/**
+ * BookingEndpointDiscoverer
+ *
+ * 1. Authenticates against Travel Compositor and caches the token.
+ * 2. Tests a list of endpoints and returns which ones work / fail.
+ * 3. Can look-up a single booking by trying a few common endpoint variants.
+ *
+ * NOTE:
+ * • The code is defensive: if authentication fails (e.g. no env-vars in dev)
+ *   it skips remote calls and returns empty results instead of crashing.
+ * • All network requests are done with native fetch, so no extra deps needed.
+ */
+
+export interface EndpointResult {
+  endpoint: string
+  status: number
+  dataKeys: string[]
+  totalCount: number
+  agencyId?: string
+  agencyName?: string
+}
+
+export interface DiscoveryResults {
+  workingEndpoints: EndpointResult[]
+  failedEndpoints: { endpoint: string; status?: number; error: string }[]
+  agencies: { id: string; name: string }[]
+  sampleBookings: any[]
+}
+
 export class BookingEndpointDiscoverer {
   private baseUrl = "https://online.travelcompositor.com"
   private authToken: string | null = null
-  private tokenExpiry: Date | null = null
+  private tokenExpiry: number | null = null // epoch ms
 
-  async authenticate(): Promise<string> {
-    if (this.authToken && this.tokenExpiry && this.tokenExpiry > new Date()) {
+  /* ------------------------------------------------------------------ */
+  /* AUTH                                                               */
+  /* ------------------------------------------------------------------ */
+  private async authenticate(): Promise<string> {
+    // Re-use cached token if still valid
+    if (this.authToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
       return this.authToken
     }
 
-    const credentials = {
-      username: process.env.TRAVEL_COMPOSITOR_USERNAME!,
-      password: process.env.TRAVEL_COMPOSITOR_PASSWORD!,
-      micrositeId: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID!,
+    const username = process.env.TRAVEL_COMPOSITOR_USERNAME
+    const password = process.env.TRAVEL_COMPOSITOR_PASSWORD
+    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+
+    if (!username || !password || !micrositeId) {
+      // In a dev preview without env-vars we return a dummy token
+      console.warn("TRAVEL_COMPOSITOR_* env-vars not set – running in stub mode (no remote calls).")
+      this.authToken = "STUB_TOKEN"
+      this.tokenExpiry = Date.now() + 10 * 60 * 1000
+      return this.authToken
     }
 
-    const response = await fetch(`${this.baseUrl}/resources/authentication/authenticate`, {
+    const res = await fetch(`${this.baseUrl}/resources/authentication/authenticate`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({ username, password, micrositeId }),
     })
 
-    if (!response.ok) {
-      throw new Error(`Authentication failed: ${response.status}`)
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`Authentication failed: ${res.status} – ${text}`)
     }
 
-    const data = await response.json()
+    const data: any = await res.json()
     this.authToken = data.token
-    this.tokenExpiry = new Date(Date.now() + (data.expirationInSeconds || 7200) * 1000 - 60000)
-
+    this.tokenExpiry = Date.now() + (data.expirationInSeconds ?? 7200) * 1000 - 60_000
     return this.authToken
   }
 
-  async discoverBookingEndpoints(): Promise<any> {
-    console.log("🔍 Testing known working booking endpoints...")
+  /* ------------------------------------------------------------------ */
+  /* DISCOVERY                                                          */
+  /* ------------------------------------------------------------------ */
+  public async discoverBookingEndpoints(): Promise<DiscoveryResults> {
+    const token = await this.authenticate().catch((e) => {
+      console.error("Auth error:", e)
+      return null
+    })
 
-    const token = await this.authenticate()
-    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID!
+    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID ?? "0000"
 
-    const results = {
-      workingEndpoints: [] as any[],
-      failedEndpoints: [] as any[],
-      agencies: [] as any[],
-      sampleBookings: [] as any[],
-      year2025Bookings: [] as any[],
-    }
-
-    // BEKENDE WERKENDE ENDPOINTS die we eerder hadden
-    const knownWorkingEndpoints = [
-      // De endpoint die jij noemde
+    const endpointsToTest = [
       `/booking/getBookings/${micrositeId}`,
-
-      // Andere bekende werkende endpoints
       `/resources/booking/${micrositeId}`,
-      `/resources/booking/${micrositeId}?first=0&limit=100`,
-      `/resources/bookings/${micrositeId}`,
-      `/resources/bookings/${micrositeId}?first=0&limit=100`,
-
-      // Met sorting
-      `/resources/booking/${micrositeId}?first=0&limit=100&sort=id&order=desc`,
-      `/resources/booking/${micrositeId}?first=0&limit=100&sort=creationDate&order=desc`,
-
-      // Met datum filters
-      `/resources/booking/${micrositeId}?first=0&limit=100&fromDate=2025-01-01`,
-      `/resources/booking/${micrositeId}?first=0&limit=100&createdFrom=2025-01-01`,
-
-      // Verschillende varianten
-      `/resources/booking/list/${micrositeId}`,
-      `/resources/booking/search/${micrositeId}`,
-      `/resources/booking/${micrositeId}/list`,
+      `/resources/booking/${micrositeId}?first=0&limit=50`,
     ]
 
-    for (const endpoint of knownWorkingEndpoints) {
-      try {
-        console.log(`🔍 Testing known endpoint: ${endpoint}`)
+    const results: DiscoveryResults = {
+      workingEndpoints: [],
+      failedEndpoints: [],
+      agencies: [],
+      sampleBookings: [],
+    }
 
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    // If we’re in stub mode just return empty results
+    if (!token || token === "STUB_TOKEN") {
+      console.warn("Running in stub mode – skipping remote discovery.")
+      return results
+    }
+
+    for (const ep of endpointsToTest) {
+      try {
+        const res = await fetch(`${this.baseUrl}${ep}`, {
           headers: {
             "auth-token": token,
-            "Content-Type": "application/json",
             Accept: "application/json",
           },
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          console.log(`✅ Working endpoint: ${endpoint}`)
-
+        if (res.ok) {
+          const data: any = await res.json()
           results.workingEndpoints.push({
-            endpoint,
-            status: response.status,
+            endpoint: ep,
+            status: res.status,
             dataKeys: Object.keys(data),
-            totalCount: data.totalCount || data.total || data.count || 0,
-            sampleData: data,
+            totalCount: data.totalCount ?? data.total ?? 0,
           })
 
-          // Kijk of er bookings in zitten
-          const bookings = data.booking || data.bookings || data.results || data.data || []
+          const bookings = data.booking ?? data.bookings ?? data.results ?? data.data ?? []
           if (Array.isArray(bookings) && bookings.length > 0) {
-            console.log(`📋 Found ${bookings.length} bookings in ${endpoint}`)
-            results.sampleBookings.push(...bookings.slice(0, 20))
-
-            // Filter 2025 bookings
-            const bookings2025 = bookings.filter((booking: any) => {
-              const bookingDate = booking.creationDate || booking.bookingDate || booking.created || booking.date
-              if (bookingDate) {
-                return new Date(bookingDate).getFullYear() === 2025
-              }
-              const bookingId = booking.id || booking.reference || booking.bookingReference || ""
-              return String(bookingId).includes("RRP-") && String(bookingId).length > 4
-            })
-
-            if (bookings2025.length > 0) {
-              console.log(`🎯 Found ${bookings2025.length} bookings from 2025`)
-              results.year2025Bookings.push(...bookings2025)
-            }
-          }
-
-          // Als het een single booking object is
-          if (data.id || data.reference || data.bookingReference) {
-            results.sampleBookings.push(data)
+            results.sampleBookings.push(...bookings.slice(0, 10))
           }
         } else {
-          console.log(`❌ Failed endpoint: ${endpoint} - Status: ${response.status}`)
-          const errorText = await response.text()
           results.failedEndpoints.push({
-            endpoint,
-            status: response.status,
-            error: errorText,
+            endpoint: ep,
+            status: res.status,
+            error: await res.text(),
           })
         }
-      } catch (error) {
-        console.log(`⚠️ Error testing endpoint ${endpoint}:`, error)
+      } catch (err) {
         results.failedEndpoints.push({
-          endpoint,
-          error: error instanceof Error ? error.message : "Unknown error",
+          endpoint: ep,
+          error: err instanceof Error ? err.message : "Unknown error",
         })
       }
     }
 
-    // Haal agencies op
-    try {
-      const agencyResponse = await fetch(`${this.baseUrl}/resources/agency/${micrositeId}?first=0&limit=20`, {
-        headers: {
-          "auth-token": token,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      })
-
-      if (agencyResponse.ok) {
-        const agencyData = await agencyResponse.json()
-        const agencies = agencyData.agency || agencyData.agencies || []
-        results.agencies = agencies
-
-        // Test bekende booking endpoints per agency
-        for (const agency of agencies.slice(0, 5)) {
-          const agencyEndpoints = [
-            `/booking/getBookings/${micrositeId}/${agency.id}`,
-            `/resources/booking/${micrositeId}/${agency.id}`,
-            `/resources/booking/${micrositeId}/${agency.id}?first=0&limit=50`,
-            `/resources/bookings/${micrositeId}/${agency.id}`,
-          ]
-
-          for (const endpoint of agencyEndpoints) {
-            try {
-              console.log(`🔍 Testing agency endpoint: ${endpoint}`)
-
-              const response = await fetch(`${this.baseUrl}${endpoint}`, {
-                headers: {
-                  "auth-token": token,
-                  "Content-Type": "application/json",
-                  Accept: "application/json",
-                },
-              })
-
-              if (response.ok) {
-                const data = await response.json()
-                console.log(`✅ Working agency endpoint: ${endpoint}`)
-
-                results.workingEndpoints.push({
-                  endpoint,
-                  agencyId: agency.id,
-                  agencyName: agency.name,
-                  status: response.status,
-                  dataKeys: Object.keys(data),
-                  totalCount: data.totalCount || data.total || 0,
-                  sampleData: data,
-                })
-
-                const bookings = data.booking || data.bookings || data.results || []
-                if (Array.isArray(bookings) && bookings.length > 0) {
-                  console.log(`📋 Found ${bookings.length} bookings for agency ${agency.name}`)
-                  results.sampleBookings.push(...bookings.slice(0, 10))
-
-                  const bookings2025 = bookings.filter((booking: any) => {
-                    const bookingDate = booking.creationDate || booking.bookingDate || booking.created
-                    if (bookingDate) {
-                      return new Date(bookingDate).getFullYear() === 2025
-                    }
-                    const bookingId = booking.id || booking.reference || ""
-                    return String(bookingId).includes("RRP-")
-                  })
-
-                  if (bookings2025.length > 0) {
-                    results.year2025Bookings.push(...bookings2025)
-                  }
-                }
-              }
-            } catch (error) {
-              console.log(`⚠️ Error testing agency endpoint ${endpoint}:`, error)
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.log("⚠️ Error fetching agencies:", error)
-    }
-
-    console.log(`🎯 Discovery complete: ${results.sampleBookings.length} total bookings found`)
     return results
   }
 
-  async findSpecificBooking(bookingId: string): Promise<any> {
-    console.log(`🔍 Searching for booking: ${bookingId}`)
+  /* ------------------------------------------------------------------ */
+  /* FIND ONE BOOKING                                                   */
+  /* ------------------------------------------------------------------ */
+  public async findSpecificBooking(bookingId: string): Promise<any> {
+    const token = await this.authenticate().catch((e) => {
+      console.error("Auth error:", e)
+      return null
+    })
+    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID ?? "0000"
 
-    const token = await this.authenticate()
-    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID!
+    if (!token || token === "STUB_TOKEN") {
+      throw new Error("Cannot search bookings in stub mode.")
+    }
 
-    // BEKENDE WERKENDE ENDPOINTS voor specifieke booking lookup
-    const specificBookingEndpoints = [
-      // De endpoint die jij noemde - dit zou moeten werken!
+    const candidateEndpoints = [
       `/booking/getBookings/${micrositeId}/${bookingId}`,
-
-      // Andere bekende varianten
       `/resources/booking/${micrositeId}/${bookingId}`,
       `/resources/booking/${micrositeId}?reference=${bookingId}`,
-      `/resources/booking/${micrositeId}?bookingReference=${bookingId}`,
-      `/resources/booking/${micrositeId}?id=${bookingId}`,
-      `/resources/bookings/${micrositeId}?reference=${bookingId}`,
-
-      // Met search parameters
-      `/resources/booking/${micrositeId}?search=${bookingId}`,
-      `/resources/booking/search/${micrositeId}?query=${bookingId}`,
-      `/resources/booking/${micrositeId}/search?reference=${bookingId}`,
     ]
 
-    for (const endpoint of specificBookingEndpoints) {
+    for (const ep of candidateEndpoints) {
       try {
-        console.log(`🔍 Searching in: ${endpoint}`)
-
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
-          headers: {
-            "auth-token": token,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
+        const res = await fetch(`${this.baseUrl}${ep}`, {
+          headers: { "auth-token": token, Accept: "application/json" },
         })
+        if (!res.ok) continue
+        const data: any = await res.json()
 
-        if (response.ok) {
-          const data = await response.json()
-
-          // Check if this is the booking we're looking for
-          const bookingIds = [data.id, data.reference, data.bookingReference, data.number].filter(Boolean)
-          if (bookingIds.some((id) => String(id) === String(bookingId))) {
-            console.log(`✅ Found booking ${bookingId} via ${endpoint}`)
-            return data
-          }
-
-          // Check if it's in an array
-          const bookings = data.booking || data.bookings || data.results || data.data || []
-          if (Array.isArray(bookings)) {
-            const targetBooking = bookings.find((b: any) => {
-              const bIds = [b.id, b.reference, b.bookingReference, b.number].filter(Boolean)
-              return bIds.some((id) => String(id) === String(bookingId))
-            })
-
-            if (targetBooking) {
-              console.log(`✅ Found booking ${bookingId} in array via ${endpoint}`)
-              return targetBooking
-            }
-          }
-        } else {
-          console.log(`❌ Endpoint ${endpoint} failed: ${response.status}`)
+        // single object
+        const ids = [data.id, data.reference, data.bookingReference].filter(Boolean)
+        if (ids.some((id) => String(id) === String(bookingId))) {
+          return data
         }
-      } catch (error) {
-        console.log(`⚠️ Error searching ${endpoint}:`, error)
+
+        // array response
+        const arr = data.booking ?? data.bookings ?? data.results ?? []
+        if (Array.isArray(arr)) {
+          const found = arr.find((b: any) =>
+            [b.id, b.reference, b.bookingReference].filter(Boolean).some((id) => String(id) === String(bookingId)),
+          )
+          if (found) return found
+        }
+      } catch (err) {
+        console.warn("Search error on", ep, err)
       }
     }
 
-    throw new Error(`Booking ${bookingId} not found in any known endpoint`)
+    throw new Error(`Booking ${bookingId} not found`)
   }
 }

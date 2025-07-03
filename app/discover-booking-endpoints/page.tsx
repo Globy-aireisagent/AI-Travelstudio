@@ -2,15 +2,14 @@ import BookingEndpointDiscoverer from "@/components/booking-endpoint-discoverer"
 
 export default function DiscoverBookingEndpointsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-gray-900">Booking Endpoint Discovery</h1>
-          <p className="text-xl text-gray-600">Find working booking endpoints and discover sample bookings</p>
-        </div>
+    <main className="container mx-auto max-w-5xl py-10">
+      <h1 className="text-3xl font-bold mb-8 text-center">Booking Endpoint Discovery</h1>
+      <p className="text-center mb-10 text-muted-foreground">
+        Find working booking endpoints and discover sample bookings
+      </p>
 
-        <BookingEndpointDiscoverer />
-      </div>
-    </div>
+      {/* Client component */}
+      <BookingEndpointDiscoverer />
+    </main>
   )
 }

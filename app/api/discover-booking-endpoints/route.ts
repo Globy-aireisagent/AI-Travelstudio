@@ -1,29 +1,16 @@
+"use server"
+
 import { type NextRequest, NextResponse } from "next/server"
 import { BookingEndpointDiscoverer } from "@/lib/booking-endpoint-discoverer"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const discoverer = new BookingEndpointDiscoverer()
     const results = await discoverer.discoverBookingEndpoints()
-
-    return NextResponse.json({
-      success: true,
-      results,
-      summary: {
-        workingEndpoints: results.workingEndpoints.length,
-        failedEndpoints: results.failedEndpoints.length,
-        agencies: results.agencies.length,
-        sampleBookings: results.sampleBookings.length,
-      },
-    })
-  } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Discovery failed",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json(results)
+  } catch (err) {
+    console.error("Discovery failed:", err)
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 })
   }
 }
 
@@ -44,10 +31,12 @@ export async function POST(request: NextRequest) {
       message: `Found booking ${bookingId}`,
     })
   } catch (error) {
+    console.error("Booking search error:", error)
     return NextResponse.json(
       {
         success: false,
         error: error instanceof Error ? error.message : "Booking search failed",
+        details: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 },
     )
