@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-// Simpel wachtwoord - later kunnen we dit verbeteren
 const ADMIN_PASSWORD = "TravelStudio2025!"
 
 export async function POST(request: NextRequest) {
@@ -8,7 +7,17 @@ export async function POST(request: NextRequest) {
     const { password } = await request.json()
 
     if (password === ADMIN_PASSWORD) {
-      return NextResponse.json({ success: true })
+      const response = NextResponse.json({ success: true })
+
+      // Set cookie voor 24 uur
+      response.cookies.set("admin-auth", "authenticated", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 24 * 60 * 60, // 24 uur
+      })
+
+      return response
     } else {
       return NextResponse.json({ success: false, error: "Invalid password" }, { status: 401 })
     }

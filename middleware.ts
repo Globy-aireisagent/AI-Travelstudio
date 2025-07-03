@@ -1,28 +1,16 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-// Beschermde routes
-const protectedRoutes = [
-  "/single-microsite-test",
-  "/travel-compositor-import",
-  "/universal-import",
-  "/agent-dashboard",
-  "/super-admin",
-  "/master-dashboard",
-]
-
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  // Alleen beschermen van admin routes
+  if (
+    request.nextUrl.pathname.startsWith("/single-microsite-test") ||
+    request.nextUrl.pathname.startsWith("/travel-compositor-import") ||
+    request.nextUrl.pathname.startsWith("/admin")
+  ) {
+    const isAuthenticated = request.cookies.get("admin-auth")?.value === "authenticated"
 
-  // Check of de route beschermd is
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
-
-  if (isProtectedRoute) {
-    // Check voor admin cookie
-    const adminCookie = request.cookies.get("admin-access")
-
-    if (!adminCookie || adminCookie.value !== "authenticated") {
-      // Redirect naar login
+    if (!isAuthenticated) {
       return NextResponse.redirect(new URL("/admin-login", request.url))
     }
   }
@@ -31,5 +19,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/single-microsite-test/:path*", "/travel-compositor-import/:path*", "/admin/:path*"],
 }
