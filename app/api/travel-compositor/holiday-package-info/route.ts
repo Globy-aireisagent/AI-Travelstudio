@@ -1,117 +1,173 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const holidayPackageEndpoints = {
-      endpoints: [
-        {
-          name: "Package Details",
-          method: "GET",
-          url: "/resources/package/{micrositeId}/{holidayPackageId}",
-          description: "Haalt gedetailleerde informatie op over een specifiek holiday package",
-          parameters: [
-            { name: "micrositeId", type: "path", required: true, description: "ID van de microsite" },
-            { name: "holidayPackageId", type: "path", required: true, description: "ID van het holiday package" },
-            { name: "lang", type: "query", required: false, description: "Taalcode (nl, en, de, fr)" },
-          ],
-          headers: [{ name: "auth-token", required: true, description: "Authenticatie token" }],
-          example: "https://online.travelcompositor.com/resources/package/12345/PKG-001?lang=nl",
-        },
-        {
-          name: "Package Calendar",
-          method: "GET",
-          url: "/resources/package/calendar/{micrositeId}/{holidayPackageId}",
-          description: "Haalt beschikbaarheid en prijzen op voor een holiday package",
-          parameters: [
-            { name: "micrositeId", type: "path", required: true, description: "ID van de microsite" },
-            { name: "holidayPackageId", type: "path", required: true, description: "ID van het holiday package" },
-            { name: "currency", type: "query", required: false, description: "Valutacode (EUR, USD, GBP)" },
-          ],
-          headers: [{ name: "auth-token", required: true, description: "Authenticatie token" }],
-          example: "https://online.travelcompositor.com/resources/package/calendar/12345/PKG-001?currency=EUR",
-        },
-        {
-          name: "List All Packages",
-          method: "GET",
-          url: "/resources/package/{micrositeId}",
-          description: "Haalt lijst op van alle beschikbare holiday packages",
-          parameters: [
-            { name: "micrositeId", type: "path", required: true, description: "ID van de microsite" },
-            { name: "lang", type: "query", required: true, description: "Taalcode" },
-            { name: "first", type: "query", required: false, description: "Paginatie offset" },
-            { name: "limit", type: "query", required: false, description: "Aantal resultaten per pagina" },
-            { name: "destination", type: "query", required: false, description: "Filter op bestemming" },
-            { name: "theme", type: "query", required: false, description: "Filter op thema" },
-          ],
-          headers: [{ name: "auth-token", required: true, description: "Authenticatie token" }],
-          example: "https://online.travelcompositor.com/resources/package/12345?lang=nl&limit=10",
-        },
-        {
-          name: "Book Package",
-          method: "POST",
-          url: "/resources/package/book/{micrositeId}/{holidayPackageId}",
-          description: "Maakt een boeking aan voor een holiday package",
-          parameters: [
-            { name: "micrositeId", type: "path", required: true, description: "ID van de microsite" },
-            { name: "holidayPackageId", type: "path", required: true, description: "ID van het holiday package" },
-          ],
-          headers: [
-            { name: "auth-token", required: true, description: "Authenticatie token" },
-            { name: "Content-Type", required: true, description: "application/json" },
-          ],
-          body: {
-            passengers: "Array van passagier objecten",
-            departureDate: "Vertrekdatum (YYYY-MM-DD)",
-            paymentMethod: "Betaalmethode",
-            specialRequests: "Speciale verzoeken",
-          },
-          example: "POST https://online.travelcompositor.com/resources/package/book/12345/PKG-001",
-        },
-      ],
-      authentication: {
-        method: "POST",
-        url: "/resources/authentication/authenticate",
-        description: "Authenticeer om een auth-token te krijgen",
-        body: {
-          username: "Je Travel Compositor gebruikersnaam",
-          password: "Je Travel Compositor wachtwoord",
-          micrositeId: "ID van de microsite",
-        },
-      },
-      microsites: [
-        {
-          id: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID,
-          name: "rondreis-planner",
-          description: "Primaire microsite voor rondreizen",
-        },
-        {
-          id: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_2,
-          name: "reisbureaunederland",
-          description: "Secundaire microsite",
-        },
-        {
-          id: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_3,
-          name: "auto",
-          description: "Auto microsite",
-        },
-        {
-          id: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_4,
-          name: "microsite-4",
-          description: "Vierde microsite",
-        },
-      ],
+    const { searchParams } = new URL(request.url)
+    const config = searchParams.get("config") || "1"
+
+    console.log(`📋 Getting holiday package info for config ${config}`)
+
+    // Get credentials based on config
+    let username, password, micrositeId
+    switch (config) {
+      case "1":
+        username = process.env.TRAVEL_COMPOSITOR_USERNAME
+        password = process.env.TRAVEL_COMPOSITOR_PASSWORD
+        micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+        break
+      case "2":
+        username = process.env.TRAVEL_COMPOSITOR_USERNAME_2
+        password = process.env.TRAVEL_COMPOSITOR_PASSWORD_2
+        micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_2
+        break
+      case "3":
+        username = process.env.TRAVEL_COMPOSITOR_USERNAME_3
+        password = process.env.TRAVEL_COMPOSITOR_PASSWORD_3
+        micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_3
+        break
+      default:
+        username = process.env.TRAVEL_COMPOSITOR_USERNAME
+        password = process.env.TRAVEL_COMPOSITOR_PASSWORD
+        micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
     }
+
+    if (!username || !password || !micrositeId) {
+      throw new Error(`Missing credentials for config ${config}`)
+    }
+
+    // Authenticate with Travel Compositor
+    const authResponse = await fetch("https://online.travelcompositor.com/resources/authentication/authenticate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        password,
+        micrositeId,
+      }),
+    })
+
+    if (!authResponse.ok) {
+      const errorText = await authResponse.text()
+      throw new Error(`Authentication failed: ${authResponse.status} - ${errorText}`)
+    }
+
+    const authData = await authResponse.json()
+    const token = authData.token
+
+    console.log(`🔑 Authentication successful, exploring available endpoints`)
+
+    const results = {
+      micrositeId,
+      availablePackages: [],
+      availableIdeas: [],
+      availableDestinations: [],
+      endpoints: [],
+    }
+
+    // Try different endpoints to see what's available
+    const endpointsToTry = [
+      {
+        name: "packages",
+        url: `https://online.travelcompositor.com/resources/packages/${micrositeId}`,
+      },
+      {
+        name: "travel-ideas",
+        url: `https://online.travelcompositor.com/resources/travelideas/${micrositeId}`,
+      },
+      {
+        name: "destinations",
+        url: `https://online.travelcompositor.com/resources/destination/${micrositeId}`,
+      },
+      {
+        name: "accommodations",
+        url: `https://online.travelcompositor.com/resources/accommodations`,
+      },
+    ]
+
+    for (const endpoint of endpointsToTry) {
+      try {
+        console.log(`🔍 Trying endpoint: ${endpoint.name}`)
+
+        const response = await fetch(endpoint.url, {
+          method: "GET",
+          headers: {
+            "auth-token": token,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`✅ ${endpoint.name} success:`, Object.keys(data))
+
+          results.endpoints.push({
+            name: endpoint.name,
+            url: endpoint.url,
+            status: "success",
+            dataKeys: Object.keys(data),
+            sampleData: JSON.stringify(data).substring(0, 500) + "...",
+          })
+
+          // Extract specific data types
+          if (endpoint.name === "packages" && data.packages) {
+            results.availablePackages = data.packages.slice(0, 5).map((pkg: any) => ({
+              id: pkg.id,
+              name: pkg.name,
+              description: pkg.description?.substring(0, 100),
+            }))
+          }
+
+          if (endpoint.name === "travel-ideas" && data.travelIdeas) {
+            results.availableIdeas = data.travelIdeas.slice(0, 5).map((idea: any) => ({
+              id: idea.id,
+              name: idea.name,
+              description: idea.description?.substring(0, 100),
+            }))
+          }
+
+          if (endpoint.name === "destinations" && data.destination) {
+            results.availableDestinations = data.destination.slice(0, 10).map((dest: any) => ({
+              id: dest.id,
+              name: dest.name,
+              country: dest.country,
+            }))
+          }
+        } else {
+          console.log(`❌ ${endpoint.name} failed: ${response.status}`)
+          results.endpoints.push({
+            name: endpoint.name,
+            url: endpoint.url,
+            status: "failed",
+            error: `HTTP ${response.status}`,
+          })
+        }
+      } catch (error) {
+        console.log(`❌ ${endpoint.name} error:`, error)
+        results.endpoints.push({
+          name: endpoint.name,
+          url: endpoint.url,
+          status: "error",
+          error: error instanceof Error ? error.message : "Unknown error",
+        })
+      }
+    }
+
+    console.log("📊 Holiday package info results:", results)
 
     return NextResponse.json({
       success: true,
-      data: holidayPackageEndpoints,
+      data: results,
     })
   } catch (error) {
     console.error("❌ Error getting holiday package info:", error)
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       },
       { status: 500 },
     )

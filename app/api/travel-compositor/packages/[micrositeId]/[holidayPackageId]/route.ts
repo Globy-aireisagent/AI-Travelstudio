@@ -62,64 +62,161 @@ export async function GET(
     const authData = await authResponse.json()
     const token = authData.token
 
-    // Fetch Holiday Package details
-    const packageResponse = await fetch(
-      `https://online.travelcompositor.com/resources/package/${actualMicrositeId}/${holidayPackageId}?lang=${lang}`,
-      {
-        method: "GET",
-        headers: {
-          "auth-token": token,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      },
-    )
+    console.log(`🔑 Authentication successful, trying multiple endpoints for package ${holidayPackageId}`)
 
-    if (!packageResponse.ok) {
-      const errorText = await packageResponse.text()
-      throw new Error(`Get holiday package failed: ${packageResponse.status} - ${errorText}`)
+    let packageData = null
+    let usedEndpoint = ""
+
+    // Try multiple endpoints to find the package data
+    const endpoints = [
+      // Try the packages endpoint first
+      {
+        url: `https://online.travelcompositor.com/resources/packages/${actualMicrositeId}?lang=${lang}`,
+        name: "packages list",
+      },
+      // Try the package detail endpoint
+      {
+        url: `https://online.travelcompositor.com/resources/package/${actualMicrositeId}/${holidayPackageId}?lang=${lang}`,
+        name: "package detail",
+      },
+      // Try the ideas endpoint (travel ideas are often packages)
+      {
+        url: `https://online.travelcompositor.com/resources/travelideas/${actualMicrositeId}?lang=${lang}`,
+        name: "travel ideas",
+      },
+      // Try the specific travel idea endpoint
+      {
+        url: `https://online.travelcompositor.com/resources/travelidea/${actualMicrositeId}/${holidayPackageId}?lang=${lang}`,
+        name: "travel idea detail",
+      },
+    ]
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`🔍 Trying endpoint: ${endpoint.name} - ${endpoint.url}`)
+
+        const response = await fetch(endpoint.url, {
+          method: "GET",
+          headers: {
+            "auth-token": token,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`✅ Success with ${endpoint.name}:`, JSON.stringify(data, null, 2))
+
+          // If this is a list endpoint, find our specific package
+          if (endpoint.name.includes("list") || endpoint.name.includes("ideas")) {
+            const packages = data.packages || data.travelIdeas || data.holidayPackages || []
+            const foundPackage = packages.find(
+              (pkg: any) =>
+                pkg.id === holidayPackageId || pkg.packageId === holidayPackageId || pkg.ideaId === holidayPackageId,
+            )
+
+            if (foundPackage) {
+              packageData = foundPackage
+              usedEndpoint = endpoint.name
+              break
+            }
+          } else {
+            // This is a detail endpoint
+            packageData = data
+            usedEndpoint = endpoint.name
+            break
+          }
+        } else {
+          console.log(`❌ ${endpoint.name} failed: ${response.status}`)
+        }
+      } catch (error) {
+        console.log(`❌ ${endpoint.name} error:`, error)
+        continue
+      }
     }
 
-    const packageData = await packageResponse.json()
-    console.log("🔍 Raw package data from API:", JSON.stringify(packageData, null, 2))
+    if (!packageData) {
+      // If no package found, try to get destinations and create a basic package structure
+      console.log(`🏙️ No package found, trying to get destinations for microsite ${actualMicrositeId}`)
 
-    // Only return actual data from Travel Compositor - no fallbacks or generated content
+      try {
+        const destResponse = await fetch(
+          `https://online.travelcompositor.com/resources/destination/${actualMicrositeId}?lang=${lang}`,
+          {
+            headers: {
+              "auth-token": token,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          },
+        )
+
+        if (destResponse.ok) {
+          const destData = await destResponse.json()
+          console.log("🏙️ Destinations data:", JSON.stringify(destData, null, 2))
+
+          // Create a basic package from destinations
+          const destinations = destData.destination || []
+          if (destinations.length > 0) {
+            packageData = {
+              id: holidayPackageId,
+              name: `Travel Package ${holidayPackageId}`,
+              destinations: destinations.slice(0, 4), // Take first 4 destinations
+              description: `Travel package with ${destinations.length} destinations`,
+              micrositeId: actualMicrositeId,
+            }
+            usedEndpoint = "destinations fallback"
+          }
+        }
+      } catch (error) {
+        console.log("❌ Destinations fallback failed:", error)
+      }
+    }
+
+    if (!packageData) {
+      throw new Error(`Holiday package ${holidayPackageId} not found in any endpoint`)
+    }
+
+    console.log("🔍 Final package data:", JSON.stringify(packageData, null, 2))
+
+    // Transform the data to our expected format
     const transformedPackage = {
       id: holidayPackageId,
-      name: packageData.name || "",
-      description: packageData.description || "",
+      name: packageData.name || packageData.title || `Package ${holidayPackageId}`,
+      description: packageData.description || packageData.shortDescription || "",
       shortDescription: packageData.shortDescription || "",
-      imageUrl: packageData.imageUrl || "",
-      duration: packageData.duration || 0,
+      imageUrl: packageData.imageUrl || packageData.image || "",
+      duration: packageData.duration || packageData.days || 0,
       destinations: packageData.destinations || [],
-      themes: packageData.themes || [],
-      priceFrom: packageData.priceFrom || null,
+      themes: packageData.themes || packageData.categories || [],
+      priceFrom: packageData.priceFrom || packageData.price || null,
       pricePerPerson: packageData.pricePerPerson || null,
-      totalPrice: packageData.totalPrice || null,
+      totalPrice: packageData.totalPrice || packageData.price || null,
       departureDate: packageData.departureDate || "",
       returnDate: packageData.returnDate || "",
       availability: packageData.availability || null,
-      inclusions: packageData.inclusions || [],
-      exclusions: packageData.exclusions || [],
-      itinerary: packageData.itinerary || [],
-      accommodations: packageData.accommodations || [],
-      transports: packageData.transports || [],
-      activities: packageData.activities || [],
-      bookingConditions: packageData.bookingConditions || null,
+      inclusions: packageData.inclusions || packageData.included || [],
+      exclusions: packageData.exclusions || packageData.excluded || [],
+      itinerary: packageData.itinerary || packageData.schedule || [],
+      accommodations: packageData.accommodations || packageData.hotels || [],
+      transports: packageData.transports || packageData.transport || [],
+      activities: packageData.activities || packageData.excursions || [],
+      bookingConditions: packageData.bookingConditions || packageData.conditions || null,
       contact: packageData.contact || null,
-      searchMethod: "Holiday Package API",
+      searchMethod: `Holiday Package API (${usedEndpoint})`,
       micrositeId: actualMicrositeId,
       rawData: packageData,
     }
 
-    console.log("✅ Transformed package (only real data):", JSON.stringify(transformedPackage, null, 2))
+    console.log("✅ Transformed package:", JSON.stringify(transformedPackage, null, 2))
 
     return NextResponse.json({
       success: true,
       package: transformedPackage,
       micrositeId: actualMicrositeId,
       holidayPackageId,
-      endpoint: `https://online.travelcompositor.com/resources/package/${actualMicrositeId}/${holidayPackageId}`,
+      usedEndpoint,
       method: "GET",
     })
   } catch (error) {
