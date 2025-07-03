@@ -33,84 +33,106 @@ interface HolidayPackage {
   id: string
   name: string
   description: string
-  shortDescription: string
-  imageUrl: string
+  shortDescription?: string
+  imageUrl?: string
   duration: number
   destinations: string[]
-  themes: string[]
-  priceFrom: {
+  themes?: string[]
+  priceFrom?: {
     amount: number
     currency: string
   }
-  pricePerPerson: {
+  pricePerPerson?: {
     amount: number
     currency: string
   }
-  totalPrice: {
+  totalPrice?: {
     amount: number
     currency: string
   }
-  departureDate: string
-  returnDate: string
-  availability: {
+  departureDate?: string
+  returnDate?: string
+  availability?: {
     available: boolean
     spotsLeft: number
     totalSpots: number
   }
-  inclusions: string[]
-  exclusions: string[]
-  itinerary: Array<{
+  inclusions?: string[]
+  exclusions?: string[]
+  itinerary?: Array<{
     day: number
     title: string
     description: string
-    activities: string[]
-    accommodation: string
-    meals: string[]
+    activities?: string[]
+    accommodation?: string
+    meals?: string[]
   }>
-  accommodations: Array<{
+  accommodations?: Array<{
     name: string
     type: string
-    category: number
+    category?: number
     location: string
-    description: string
-    amenities: string[]
-    images: string[]
+    description?: string
+    amenities?: string[]
+    images?: string[]
   }>
-  transports: Array<{
+  transports?: Array<{
     type: string
     from: string
     to: string
-    date: string
-    time: string
-    duration: string
-    company: string
+    date?: string
+    time?: string
+    duration?: string
+    company?: string
   }>
-  activities: Array<{
+  activities?: Array<{
     name: string
     type: string
-    description: string
-    duration: string
+    description?: string
+    duration?: string
     included: boolean
     price?: {
       amount: number
       currency: string
     }
   }>
-  bookingConditions: {
-    cancellationPolicy: string
-    paymentTerms: string
-    minimumAge: number
-    maximumGroupSize: number
-    requiredDocuments: string[]
+  bookingConditions?: {
+    cancellationPolicy?: string
+    paymentTerms?: string
+    minimumAge?: number
+    maximumGroupSize?: number
+    requiredDocuments?: string[]
   }
-  contact: {
-    tourOperator: string
-    phone: string
-    email: string
-    website: string
+  contact?: {
+    tourOperator?: string
+    phone?: string
+    email?: string
+    website?: string
   }
   searchMethod?: string
   micrositeId?: string
+}
+
+// Safe string conversion function
+const safeString = (value: any): string => {
+  if (value === null || value === undefined) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "number") return value.toString()
+  if (typeof value === "boolean") return value ? "Ja" : "Nee"
+  if (typeof value === "object") {
+    // Handle objects by converting to JSON or extracting meaningful info
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(", ") : "Geen items"
+    }
+    return JSON.stringify(value)
+  }
+  return String(value)
+}
+
+// Safe array conversion function
+const safeArray = (value: any): any[] => {
+  if (Array.isArray(value)) return value
+  return []
 }
 
 // Image Slideshow Component
@@ -118,7 +140,7 @@ function ImageSlideshow({ images, alt }: { images: string[]; alt: string }) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
   // Safe array handling
-  const safeImages = Array.isArray(images) ? images.filter(Boolean) : []
+  const safeImages = safeArray(images).filter((img) => typeof img === "string" && img.length > 0)
 
   if (safeImages.length === 0) {
     return (
@@ -199,93 +221,148 @@ export default function PackageWerkbladPage() {
         console.log("📋 Parsed holiday package data:", packageData)
 
         if (packageData && typeof packageData === "object") {
-          // Ensure all arrays are properly initialized
+          // Safely process the package data
           const safePackageData: HolidayPackage = {
-            id: packageData.id || "UNKNOWN",
-            name: packageData.name || "Untitled Holiday Package",
-            description: packageData.description || "",
-            shortDescription: packageData.shortDescription || "",
-            imageUrl: packageData.imageUrl || "",
-            duration: packageData.duration || 0,
-            destinations: Array.isArray(packageData.destinations) ? packageData.destinations : [],
-            themes: Array.isArray(packageData.themes) ? packageData.themes : [],
-            priceFrom: packageData.priceFrom || { amount: 0, currency: "EUR" },
-            pricePerPerson: packageData.pricePerPerson || { amount: 0, currency: "EUR" },
-            totalPrice: packageData.totalPrice || { amount: 0, currency: "EUR" },
-            departureDate: packageData.departureDate || "",
-            returnDate: packageData.returnDate || "",
-            availability: packageData.availability || {
-              available: true,
-              spotsLeft: 0,
-              totalSpots: 0,
-            },
-            inclusions: Array.isArray(packageData.inclusions) ? packageData.inclusions : [],
-            exclusions: Array.isArray(packageData.exclusions) ? packageData.exclusions : [],
-            itinerary: Array.isArray(packageData.itinerary)
-              ? packageData.itinerary.map((day: any) => ({
-                  day: day.day || 0,
-                  title: day.title || "",
-                  description: day.description || "",
-                  activities: Array.isArray(day.activities) ? day.activities : [],
-                  accommodation: day.accommodation || "",
-                  meals: Array.isArray(day.meals) ? day.meals : [],
-                }))
-              : [],
-            accommodations: Array.isArray(packageData.accommodations)
-              ? packageData.accommodations.map((acc: any) => ({
-                  name: acc.name || "",
-                  type: acc.type || "",
-                  category: acc.category || 0,
-                  location: acc.location || "",
-                  description: acc.description || "",
-                  amenities: Array.isArray(acc.amenities) ? acc.amenities : [],
-                  images: Array.isArray(acc.images) ? acc.images : [],
-                }))
-              : [],
-            transports: Array.isArray(packageData.transports)
-              ? packageData.transports.map((transport: any) => ({
-                  type: transport.type || "",
-                  from: transport.from || "",
-                  to: transport.to || "",
-                  date: transport.date || "",
-                  time: transport.time || "",
-                  duration: transport.duration || "",
-                  company: transport.company || "",
-                }))
-              : [],
-            activities: Array.isArray(packageData.activities)
-              ? packageData.activities.map((activity: any) => ({
-                  name: activity.name || "",
-                  type: activity.type || "",
-                  description: activity.description || "",
-                  duration: activity.duration || "",
-                  included: activity.included || false,
-                  price: activity.price || undefined,
-                }))
-              : [],
-            bookingConditions: packageData.bookingConditions || {
-              cancellationPolicy: "Standard cancellation policy",
-              paymentTerms: "Payment required at booking",
-              minimumAge: 0,
-              maximumGroupSize: 50,
-              requiredDocuments: ["Valid passport"],
-            },
-            contact: packageData.contact || {
-              tourOperator: "Travel Compositor",
-              phone: "",
-              email: "",
-              website: "",
-            },
-            searchMethod: packageData.searchMethod || "Unknown",
-            micrositeId: packageData.micrositeId || "Unknown",
-          }
-
-          // Ensure booking conditions arrays are safe
-          if (
-            safePackageData.bookingConditions.requiredDocuments &&
-            !Array.isArray(safePackageData.bookingConditions.requiredDocuments)
-          ) {
-            safePackageData.bookingConditions.requiredDocuments = ["Valid passport"]
+            id: safeString(packageData.id) || "UNKNOWN",
+            name: safeString(packageData.name) || "Untitled Holiday Package",
+            description: safeString(packageData.description) || "",
+            shortDescription: safeString(packageData.shortDescription),
+            imageUrl: safeString(packageData.imageUrl),
+            duration: typeof packageData.duration === "number" ? packageData.duration : 0,
+            destinations: safeArray(packageData.destinations)
+              .map((d) => safeString(d))
+              .filter(Boolean),
+            themes: safeArray(packageData.themes)
+              .map((t) => safeString(t))
+              .filter(Boolean),
+            priceFrom:
+              packageData.priceFrom && typeof packageData.priceFrom === "object"
+                ? {
+                    amount: typeof packageData.priceFrom.amount === "number" ? packageData.priceFrom.amount : 0,
+                    currency: safeString(packageData.priceFrom.currency) || "EUR",
+                  }
+                : { amount: 0, currency: "EUR" },
+            pricePerPerson:
+              packageData.pricePerPerson && typeof packageData.pricePerPerson === "object"
+                ? {
+                    amount:
+                      typeof packageData.pricePerPerson.amount === "number" ? packageData.pricePerPerson.amount : 0,
+                    currency: safeString(packageData.pricePerPerson.currency) || "EUR",
+                  }
+                : { amount: 0, currency: "EUR" },
+            totalPrice:
+              packageData.totalPrice && typeof packageData.totalPrice === "object"
+                ? {
+                    amount: typeof packageData.totalPrice.amount === "number" ? packageData.totalPrice.amount : 0,
+                    currency: safeString(packageData.totalPrice.currency) || "EUR",
+                  }
+                : { amount: 0, currency: "EUR" },
+            departureDate: safeString(packageData.departureDate),
+            returnDate: safeString(packageData.returnDate),
+            availability:
+              packageData.availability && typeof packageData.availability === "object"
+                ? {
+                    available: Boolean(packageData.availability.available),
+                    spotsLeft:
+                      typeof packageData.availability.spotsLeft === "number" ? packageData.availability.spotsLeft : 0,
+                    totalSpots:
+                      typeof packageData.availability.totalSpots === "number" ? packageData.availability.totalSpots : 0,
+                  }
+                : { available: true, spotsLeft: 0, totalSpots: 0 },
+            inclusions: safeArray(packageData.inclusions)
+              .map((i) => safeString(i))
+              .filter(Boolean),
+            exclusions: safeArray(packageData.exclusions)
+              .map((e) => safeString(e))
+              .filter(Boolean),
+            itinerary: safeArray(packageData.itinerary).map((day: any) => ({
+              day: typeof day.day === "number" ? day.day : 0,
+              title: safeString(day.title) || "",
+              description: safeString(day.description) || "",
+              activities: safeArray(day.activities)
+                .map((a) => safeString(a))
+                .filter(Boolean),
+              accommodation: safeString(day.accommodation),
+              meals: safeArray(day.meals)
+                .map((m) => safeString(m))
+                .filter(Boolean),
+            })),
+            accommodations: safeArray(packageData.accommodations).map((acc: any) => ({
+              name: safeString(acc.name) || "",
+              type: safeString(acc.type) || "",
+              category: typeof acc.category === "number" ? acc.category : 0,
+              location: safeString(acc.location) || "",
+              description: safeString(acc.description),
+              amenities: safeArray(acc.amenities)
+                .map((a) => safeString(a))
+                .filter(Boolean),
+              images: safeArray(acc.images)
+                .map((i) => safeString(i))
+                .filter(Boolean),
+            })),
+            transports: safeArray(packageData.transports).map((transport: any) => ({
+              type: safeString(transport.type) || "",
+              from: safeString(transport.from) || "",
+              to: safeString(transport.to) || "",
+              date: safeString(transport.date),
+              time: safeString(transport.time),
+              duration: safeString(transport.duration),
+              company: safeString(transport.company),
+            })),
+            activities: safeArray(packageData.activities).map((activity: any) => ({
+              name: safeString(activity.name) || "",
+              type: safeString(activity.type) || "",
+              description: safeString(activity.description),
+              duration: safeString(activity.duration),
+              included: Boolean(activity.included),
+              price:
+                activity.price && typeof activity.price === "object"
+                  ? {
+                      amount: typeof activity.price.amount === "number" ? activity.price.amount : 0,
+                      currency: safeString(activity.price.currency) || "EUR",
+                    }
+                  : undefined,
+            })),
+            bookingConditions:
+              packageData.bookingConditions && typeof packageData.bookingConditions === "object"
+                ? {
+                    cancellationPolicy: safeString(packageData.bookingConditions.cancellationPolicy),
+                    paymentTerms: safeString(packageData.bookingConditions.paymentTerms),
+                    minimumAge:
+                      typeof packageData.bookingConditions.minimumAge === "number"
+                        ? packageData.bookingConditions.minimumAge
+                        : 0,
+                    maximumGroupSize:
+                      typeof packageData.bookingConditions.maximumGroupSize === "number"
+                        ? packageData.bookingConditions.maximumGroupSize
+                        : 50,
+                    requiredDocuments: safeArray(packageData.bookingConditions.requiredDocuments)
+                      .map((d) => safeString(d))
+                      .filter(Boolean),
+                  }
+                : {
+                    cancellationPolicy: "Standard cancellation policy",
+                    paymentTerms: "Payment required at booking",
+                    minimumAge: 0,
+                    maximumGroupSize: 50,
+                    requiredDocuments: ["Valid passport"],
+                  },
+            contact:
+              packageData.contact && typeof packageData.contact === "object"
+                ? {
+                    tourOperator: safeString(packageData.contact.tourOperator),
+                    phone: safeString(packageData.contact.phone),
+                    email: safeString(packageData.contact.email),
+                    website: safeString(packageData.contact.website),
+                  }
+                : {
+                    tourOperator: "Travel Compositor",
+                    phone: "",
+                    email: "",
+                    website: "",
+                  },
+            searchMethod: safeString(packageData.searchMethod) || "Unknown",
+            micrositeId: safeString(packageData.micrositeId) || "Unknown",
           }
 
           setHolidayPackage(safePackageData)
@@ -350,7 +427,7 @@ export default function PackageWerkbladPage() {
     )
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
     if (!dateString) return "Onbekend"
     try {
       return new Date(dateString).toLocaleDateString("nl-NL", {
@@ -364,7 +441,7 @@ export default function PackageWerkbladPage() {
     }
   }
 
-  const formatPrice = (price: { amount: number; currency: string }) => {
+  const formatPrice = (price?: { amount: number; currency: string }) => {
     if (!price || price.amount === 0) return "Prijs op aanvraag"
     return `${price.currency === "EUR" ? "€" : price.currency}${price.amount.toLocaleString()}`
   }
@@ -419,7 +496,7 @@ export default function PackageWerkbladPage() {
                 <div className="flex items-center space-x-4 text-orange-100">
                   <div className="flex items-center">
                     <MapPin className="h-4 w-4 mr-1" />
-                    {holidayPackage.destinations?.length || 0} bestemmingen
+                    {holidayPackage.destinations.length} bestemmingen
                   </div>
                   <div className="flex items-center">
                     <Clock className="h-4 w-4 mr-1" />
@@ -433,13 +510,13 @@ export default function PackageWerkbladPage() {
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold">{formatPrice(holidayPackage.totalPrice)}</div>
-                {holidayPackage.pricePerPerson?.amount > 0 && (
+                {holidayPackage.pricePerPerson && holidayPackage.pricePerPerson.amount > 0 && (
                   <div className="text-sm text-orange-100">
                     {formatPrice(holidayPackage.pricePerPerson)} per persoon
                   </div>
                 )}
                 <div className="flex items-center mt-2">
-                  {holidayPackage.availability?.available ? (
+                  {holidayPackage.availability && holidayPackage.availability.available ? (
                     <Badge className="bg-green-500/20 text-green-100">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Beschikbaar
@@ -475,7 +552,7 @@ export default function PackageWerkbladPage() {
             )}
 
             {/* Themes */}
-            {holidayPackage.themes?.length > 0 && (
+            {holidayPackage.themes && holidayPackage.themes.length > 0 && (
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-700 mb-2">Thema's</h3>
                 <div className="flex flex-wrap gap-2">
@@ -489,7 +566,7 @@ export default function PackageWerkbladPage() {
             )}
 
             {/* Destinations */}
-            {holidayPackage.destinations?.length > 0 && (
+            {holidayPackage.destinations.length > 0 && (
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-700 mb-2">Bestemmingen</h3>
                 <div className="flex flex-wrap gap-2">
@@ -507,17 +584,23 @@ export default function PackageWerkbladPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <Hotel className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-blue-600">{holidayPackage.accommodations?.length || 0}</div>
+                <div className="text-2xl font-bold text-blue-600">
+                  {holidayPackage.accommodations ? holidayPackage.accommodations.length : 0}
+                </div>
                 <div className="text-sm text-gray-600">Accommodaties</div>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <Plane className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-green-600">{holidayPackage.transports?.length || 0}</div>
+                <div className="text-2xl font-bold text-green-600">
+                  {holidayPackage.transports ? holidayPackage.transports.length : 0}
+                </div>
                 <div className="text-sm text-gray-600">Transport</div>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <Camera className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-purple-600">{holidayPackage.activities?.length || 0}</div>
+                <div className="text-2xl font-bold text-purple-600">
+                  {holidayPackage.activities ? holidayPackage.activities.length : 0}
+                </div>
                 <div className="text-sm text-gray-600">Activiteiten</div>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
@@ -539,17 +622,23 @@ export default function PackageWerkbladPage() {
             <TabsTrigger value="accommodations" className="flex flex-col items-center space-y-1 p-3">
               <Hotel className="h-4 w-4" />
               <span className="text-xs">Accommodaties</span>
-              <span className="text-xs text-gray-500">({holidayPackage.accommodations?.length || 0})</span>
+              <span className="text-xs text-gray-500">
+                ({holidayPackage.accommodations ? holidayPackage.accommodations.length : 0})
+              </span>
             </TabsTrigger>
             <TabsTrigger value="transport" className="flex flex-col items-center space-y-1 p-3">
               <Plane className="h-4 w-4" />
               <span className="text-xs">Transport</span>
-              <span className="text-xs text-gray-500">({holidayPackage.transports?.length || 0})</span>
+              <span className="text-xs text-gray-500">
+                ({holidayPackage.transports ? holidayPackage.transports.length : 0})
+              </span>
             </TabsTrigger>
             <TabsTrigger value="activities" className="flex flex-col items-center space-y-1 p-3">
               <Camera className="h-4 w-4" />
               <span className="text-xs">Activiteiten</span>
-              <span className="text-xs text-gray-500">({holidayPackage.activities?.length || 0})</span>
+              <span className="text-xs text-gray-500">
+                ({holidayPackage.activities ? holidayPackage.activities.length : 0})
+              </span>
             </TabsTrigger>
             <TabsTrigger value="inclusions" className="flex flex-col items-center space-y-1 p-3">
               <CheckCircle className="h-4 w-4" />
@@ -563,7 +652,7 @@ export default function PackageWerkbladPage() {
 
           {/* Itinerary Tab */}
           <TabsContent value="itinerary" className="space-y-4">
-            {holidayPackage.itinerary?.length > 0 ? (
+            {holidayPackage.itinerary && holidayPackage.itinerary.length > 0 ? (
               holidayPackage.itinerary.map((day, index) => (
                 <Card key={index} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                   <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white">
@@ -576,7 +665,7 @@ export default function PackageWerkbladPage() {
                     <div className="space-y-4">
                       <p className="text-gray-600">{day.description}</p>
 
-                      {day.activities?.length > 0 && (
+                      {day.activities && day.activities.length > 0 && (
                         <div>
                           <h4 className="font-semibold text-gray-700 mb-2">Activiteiten</h4>
                           <ul className="list-disc list-inside space-y-1">
@@ -595,7 +684,7 @@ export default function PackageWerkbladPage() {
                             <strong>Accommodatie:</strong> {day.accommodation}
                           </div>
                         )}
-                        {day.meals?.length > 0 && (
+                        {day.meals && day.meals.length > 0 && (
                           <div>
                             <strong>Maaltijden:</strong> {day.meals.join(", ")}
                           </div>
@@ -617,22 +706,24 @@ export default function PackageWerkbladPage() {
 
           {/* Accommodations Tab */}
           <TabsContent value="accommodations" className="space-y-4">
-            {holidayPackage.accommodations?.length > 0 ? (
+            {holidayPackage.accommodations && holidayPackage.accommodations.length > 0 ? (
               holidayPackage.accommodations.map((accommodation, index) => (
                 <Card key={index} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                   <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row gap-6">
                       <div className="md:w-1/3">
-                        <ImageSlideshow images={accommodation.images} alt={accommodation.name} />
+                        <ImageSlideshow images={accommodation.images || []} alt={accommodation.name} />
                       </div>
                       <div className="md:w-2/3">
                         <div className="flex justify-between items-start mb-4">
                           <div>
                             <h3 className="text-xl font-bold text-gray-800">{accommodation.name}</h3>
-                            <div className="flex items-center mt-1">
-                              <Star className="h-4 w-4 text-yellow-500 mr-1" />
-                              <span className="text-gray-600">{accommodation.category} sterren</span>
-                            </div>
+                            {accommodation.category && accommodation.category > 0 && (
+                              <div className="flex items-center mt-1">
+                                <Star className="h-4 w-4 text-yellow-500 mr-1" />
+                                <span className="text-gray-600">{accommodation.category} sterren</span>
+                              </div>
+                            )}
                             <div className="flex items-center mt-1">
                               <MapPin className="h-4 w-4 text-gray-500 mr-1" />
                               <span className="text-gray-600">{accommodation.location}</span>
@@ -645,7 +736,7 @@ export default function PackageWerkbladPage() {
                           <p className="text-gray-600 mb-4 text-sm">{accommodation.description}</p>
                         )}
 
-                        {accommodation.amenities?.length > 0 && (
+                        {accommodation.amenities && accommodation.amenities.length > 0 && (
                           <div>
                             <h4 className="font-semibold text-gray-700 mb-2">Faciliteiten</h4>
                             <div className="flex flex-wrap gap-1">
@@ -674,7 +765,7 @@ export default function PackageWerkbladPage() {
 
           {/* Transport Tab */}
           <TabsContent value="transport" className="space-y-4">
-            {holidayPackage.transports?.length > 0 ? (
+            {holidayPackage.transports && holidayPackage.transports.length > 0 ? (
               holidayPackage.transports.map((transport, index) => (
                 <Card key={index} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                   <CardContent className="p-6">
@@ -690,7 +781,7 @@ export default function PackageWerkbladPage() {
                           </div>
                         </div>
                       </div>
-                      <Badge className="mt-1">{transport.company}</Badge>
+                      {transport.company && <Badge className="mt-1">{transport.company}</Badge>}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div>
@@ -718,7 +809,7 @@ export default function PackageWerkbladPage() {
 
           {/* Activities Tab */}
           <TabsContent value="activities" className="space-y-4">
-            {holidayPackage.activities?.length > 0 ? (
+            {holidayPackage.activities && holidayPackage.activities.length > 0 ? (
               holidayPackage.activities.map((activity, index) => (
                 <Card key={index} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                   <CardContent className="p-6">
@@ -785,7 +876,7 @@ export default function PackageWerkbladPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
-                  {holidayPackage.inclusions?.length > 0 ? (
+                  {holidayPackage.inclusions && holidayPackage.inclusions.length > 0 ? (
                     <ul className="space-y-2">
                       {holidayPackage.inclusions.map((inclusion, index) => (
                         <li key={index} className="flex items-start">
@@ -809,7 +900,7 @@ export default function PackageWerkbladPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
-                  {holidayPackage.exclusions?.length > 0 ? (
+                  {holidayPackage.exclusions && holidayPackage.exclusions.length > 0 ? (
                     <ul className="space-y-2">
                       {holidayPackage.exclusions.map((exclusion, index) => (
                         <li key={index} className="flex items-start">
@@ -840,32 +931,37 @@ export default function PackageWerkbladPage() {
                 <CardContent className="p-6 space-y-4">
                   <div>
                     <h4 className="font-semibold text-gray-700 mb-2">Annuleringsbeleid</h4>
-                    <p className="text-sm text-gray-600">{holidayPackage.bookingConditions?.cancellationPolicy}</p>
+                    <p className="text-sm text-gray-600">
+                      {holidayPackage.bookingConditions?.cancellationPolicy || "Standaard annuleringsbeleid"}
+                    </p>
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-700 mb-2">Betalingsvoorwaarden</h4>
-                    <p className="text-sm text-gray-600">{holidayPackage.bookingConditions?.paymentTerms}</p>
+                    <p className="text-sm text-gray-600">
+                      {holidayPackage.bookingConditions?.paymentTerms || "Betaling vereist bij boeking"}
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <strong>Min. leeftijd:</strong> {holidayPackage.bookingConditions?.minimumAge} jaar
+                      <strong>Min. leeftijd:</strong> {holidayPackage.bookingConditions?.minimumAge || 0} jaar
                     </div>
                     <div>
-                      <strong>Max. groepsgrootte:</strong> {holidayPackage.bookingConditions?.maximumGroupSize}
+                      <strong>Max. groepsgrootte:</strong> {holidayPackage.bookingConditions?.maximumGroupSize || 50}
                     </div>
                   </div>
-                  {holidayPackage.bookingConditions?.requiredDocuments?.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold text-gray-700 mb-2">Vereiste documenten</h4>
-                      <ul className="list-disc list-inside space-y-1">
-                        {holidayPackage.bookingConditions.requiredDocuments.map((doc, index) => (
-                          <li key={index} className="text-sm text-gray-600">
-                            {doc}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  {holidayPackage.bookingConditions?.requiredDocuments &&
+                    holidayPackage.bookingConditions.requiredDocuments.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-gray-700 mb-2">Vereiste documenten</h4>
+                        <ul className="list-disc list-inside space-y-1">
+                          {holidayPackage.bookingConditions.requiredDocuments.map((doc, index) => (
+                            <li key={index} className="text-sm text-gray-600">
+                              {doc}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                 </CardContent>
               </Card>
 
@@ -880,7 +976,9 @@ export default function PackageWerkbladPage() {
                 <CardContent className="p-6 space-y-4">
                   <div>
                     <h4 className="font-semibold text-gray-700 mb-2">Tour Operator</h4>
-                    <p className="text-sm text-gray-600">{holidayPackage.contact?.tourOperator}</p>
+                    <p className="text-sm text-gray-600">
+                      {holidayPackage.contact?.tourOperator || "Travel Compositor"}
+                    </p>
                   </div>
                   {holidayPackage.contact?.phone && (
                     <div className="flex items-center">
@@ -913,18 +1011,22 @@ export default function PackageWerkbladPage() {
                     <h4 className="font-semibold text-gray-700 mb-2">Beschikbaarheid</h4>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        {holidayPackage.availability?.available ? (
+                        {holidayPackage.availability && holidayPackage.availability.available ? (
                           <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
                         ) : (
                           <XCircle className="h-4 w-4 text-red-600 mr-2" />
                         )}
                         <span className="text-sm text-gray-600">
-                          {holidayPackage.availability.available ? "Beschikbaar" : "Niet beschikbaar"}
+                          {holidayPackage.availability && holidayPackage.availability.available
+                            ? "Beschikbaar"
+                            : "Niet beschikbaar"}
                         </span>
                       </div>
-                      {holidayPackage.availability?.spotsLeft > 0 && (
-                        <Badge variant="outline">{holidayPackage.availability.spotsLeft} plekken over</Badge>
-                      )}
+                      {holidayPackage.availability &&
+                        holidayPackage.availability.spotsLeft &&
+                        holidayPackage.availability.spotsLeft > 0 && (
+                          <Badge variant="outline">{holidayPackage.availability.spotsLeft} plekken over</Badge>
+                        )}
                     </div>
                   </div>
                 </CardContent>
