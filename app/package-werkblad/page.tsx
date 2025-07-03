@@ -135,6 +135,15 @@ const safeArray = (value: any): any[] => {
   return []
 }
 
+// Safe destination name extraction
+const getDestinationName = (destination: any): string => {
+  if (typeof destination === "string") return destination
+  if (typeof destination === "object" && destination !== null) {
+    return destination.name || destination.code || destination.country || "Onbekende bestemming"
+  }
+  return safeString(destination)
+}
+
 // Image Slideshow Component
 function ImageSlideshow({ images, alt }: { images: string[]; alt: string }) {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -230,7 +239,15 @@ export default function PackageWerkbladPage() {
             imageUrl: safeString(packageData.imageUrl),
             duration: typeof packageData.duration === "number" ? packageData.duration : 0,
             destinations: safeArray(packageData.destinations)
-              .map((d) => safeString(d))
+              .map((d) => {
+                // Handle destination objects vs strings
+                if (typeof d === "string") return d
+                if (typeof d === "object" && d !== null) {
+                  // Extract readable name from destination object
+                  return d.name || d.code || d.description || JSON.stringify(d)
+                }
+                return safeString(d)
+              })
               .filter(Boolean),
             themes: safeArray(packageData.themes)
               .map((t) => safeString(t))
@@ -573,7 +590,7 @@ export default function PackageWerkbladPage() {
                   {holidayPackage.destinations.map((destination, index) => (
                     <Badge key={index} className="bg-orange-100 text-orange-700">
                       <MapPin className="h-3 w-3 mr-1" />
-                      {destination}
+                      {getDestinationName(destination)}
                     </Badge>
                   ))}
                 </div>
