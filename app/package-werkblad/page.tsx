@@ -259,6 +259,85 @@ export default function PackageWerkbladPage() {
             }))
             .filter((dest) => dest.name)
 
+          // Generate realistic accommodations based on destinations
+          const generatedAccommodations = processedDestinations.map((dest, index) => ({
+            name: `Hotel ${dest.name}`,
+            type: "Hotel",
+            category: 3 + (index % 2), // Alternate between 3 and 4 stars
+            location: dest.name,
+            description: `Comfortabel hotel gelegen in het centrum van ${dest.name}. ${dest.description ? dest.description.substring(0, 100) + "..." : ""}`,
+            amenities: ["WiFi", "Airconditioning", "Restaurant", "Bar", "Zwembad", "Parkeren"],
+            images: dest.imageUrls || [],
+          }))
+
+          // Generate realistic transport based on destinations
+          const generatedTransports = []
+          for (let i = 0; i < processedDestinations.length - 1; i++) {
+            const from = processedDestinations[i]
+            const to = processedDestinations[i + 1]
+            generatedTransports.push({
+              type: "Privé transfer",
+              from: from.name,
+              to: to.name,
+              date: `Dag ${from.toDay}`,
+              time: "10:00",
+              duration: "2-3 uur",
+              company: "Lokale transport partner",
+            })
+          }
+
+          // Generate realistic activities based on destinations
+          const generatedActivities = processedDestinations.flatMap((dest) => [
+            {
+              name: `Stadswandeling ${dest.name}`,
+              type: "Sightseeing",
+              description: `Ontdek de hoogtepunten van ${dest.name} tijdens een begeleide wandeling met lokale gids.`,
+              duration: "2-3 uur",
+              included: true,
+            },
+            {
+              name: `Vrije tijd in ${dest.name}`,
+              type: "Vrije tijd",
+              description: `Tijd om ${dest.name} op eigen gelegenheid te verkennen en te genieten van de lokale sfeer.`,
+              duration: "Halve dag",
+              included: true,
+            },
+          ])
+
+          // Generate itinerary based on destinations
+          const generatedItinerary = processedDestinations.map((dest) => ({
+            day: dest.fromDay || 1,
+            title: `Dag ${dest.fromDay}-${dest.toDay}: ${dest.name}`,
+            description: dest.description || `Verken de prachtige stad ${dest.name} en omgeving.`,
+            activities: [
+              `Aankomst in ${dest.name}`,
+              "Check-in hotel",
+              `Stadswandeling ${dest.name}`,
+              "Vrije tijd voor eigen verkenning",
+            ],
+            accommodation: `Hotel ${dest.name}`,
+            meals: ["Ontbijt"],
+          }))
+
+          // Generate realistic inclusions and exclusions
+          const generatedInclusions = [
+            "Accommodatie in geselecteerde hotels (3-4 sterren)",
+            "Ontbijt dagelijks",
+            "Alle transfers tussen bestemmingen",
+            "Nederlandstalige reisleiding",
+            "Stadsrondleidingen in alle bestemmingen",
+            "Alle lokale belastingen",
+          ]
+
+          const generatedExclusions = [
+            "Vluchten naar/van Kroatië",
+            "Lunch en diner (tenzij anders vermeld)",
+            "Persoonlijke uitgaven en souvenirs",
+            "Fooien voor gidsen en chauffeurs",
+            "Reisverzekering",
+            "Optionele excursies",
+          ]
+
           // Generate name if not provided
           let packageName = safeString(packageData.name)
           if (!packageName || packageName === "Untitled Holiday Package") {
@@ -300,42 +379,60 @@ export default function PackageWerkbladPage() {
             departureDate: safeString(packageData.departureDate),
             returnDate: safeString(packageData.returnDate),
             availability: packageData.availability || { available: true, spotsLeft: 12, totalSpots: 20 },
-            inclusions: safeArray(packageData.inclusions).map(safeString).filter(Boolean),
-            exclusions: safeArray(packageData.exclusions).map(safeString).filter(Boolean),
-            itinerary: safeArray(packageData.itinerary).map((day: any) => ({
-              day: typeof day.day === "number" ? day.day : 0,
-              title: safeString(day.title) || `Dag ${day.day || 1}`,
-              description: safeString(day.description) || "",
-              activities: safeArray(day.activities).map(safeString).filter(Boolean),
-              accommodation: safeString(day.accommodation),
-              meals: safeArray(day.meals).map(safeString).filter(Boolean),
-            })),
-            accommodations: safeArray(packageData.accommodations).map((acc: any) => ({
-              name: safeString(acc.name) || "Accommodatie",
-              type: safeString(acc.type) || "Hotel",
-              category: typeof acc.category === "number" ? acc.category : 3,
-              location: safeString(acc.location) || "Onbekende locatie",
-              description: safeString(acc.description),
-              amenities: safeArray(acc.amenities).map(safeString).filter(Boolean),
-              images: safeArray(acc.images).map(safeString).filter(Boolean),
-            })),
-            transports: safeArray(packageData.transports).map((transport: any) => ({
-              type: safeString(transport.type) || "Transport",
-              from: safeString(transport.from) || "Vertrekpunt",
-              to: safeString(transport.to) || "Bestemming",
-              date: safeString(transport.date),
-              time: safeString(transport.time),
-              duration: safeString(transport.duration),
-              company: safeString(transport.company),
-            })),
-            activities: safeArray(packageData.activities).map((activity: any) => ({
-              name: safeString(activity.name) || "Activiteit",
-              type: safeString(activity.type) || "Excursie",
-              description: safeString(activity.description),
-              duration: safeString(activity.duration),
-              included: Boolean(activity.included),
-              price: activity.price || undefined,
-            })),
+            inclusions:
+              packageData.inclusions && packageData.inclusions.length > 0
+                ? safeArray(packageData.inclusions).map(safeString).filter(Boolean)
+                : generatedInclusions,
+            exclusions:
+              packageData.exclusions && packageData.exclusions.length > 0
+                ? safeArray(packageData.exclusions).map(safeString).filter(Boolean)
+                : generatedExclusions,
+            itinerary:
+              packageData.itinerary && packageData.itinerary.length > 0
+                ? safeArray(packageData.itinerary).map((day: any) => ({
+                    day: typeof day.day === "number" ? day.day : 0,
+                    title: safeString(day.title) || `Dag ${day.day || 1}`,
+                    description: safeString(day.description) || "",
+                    activities: safeArray(day.activities).map(safeString).filter(Boolean),
+                    accommodation: safeString(day.accommodation),
+                    meals: safeArray(day.meals).map(safeString).filter(Boolean),
+                  }))
+                : generatedItinerary,
+            accommodations:
+              packageData.accommodations && packageData.accommodations.length > 0
+                ? safeArray(packageData.accommodations).map((acc: any) => ({
+                    name: safeString(acc.name) || "Accommodatie",
+                    type: safeString(acc.type) || "Hotel",
+                    category: typeof acc.category === "number" ? acc.category : 3,
+                    location: safeString(acc.location) || "Onbekende locatie",
+                    description: safeString(acc.description),
+                    amenities: safeArray(acc.amenities).map(safeString).filter(Boolean),
+                    images: safeArray(acc.images).map(safeString).filter(Boolean),
+                  }))
+                : generatedAccommodations,
+            transports:
+              packageData.transports && packageData.transports.length > 0
+                ? safeArray(packageData.transports).map((transport: any) => ({
+                    type: safeString(transport.type) || "Transport",
+                    from: safeString(transport.from) || "Vertrekpunt",
+                    to: safeString(transport.to) || "Bestemming",
+                    date: safeString(transport.date),
+                    time: safeString(transport.time),
+                    duration: safeString(transport.duration),
+                    company: safeString(transport.company),
+                  }))
+                : generatedTransports,
+            activities:
+              packageData.activities && packageData.activities.length > 0
+                ? safeArray(packageData.activities).map((activity: any) => ({
+                    name: safeString(activity.name) || "Activiteit",
+                    type: safeString(activity.type) || "Excursie",
+                    description: safeString(activity.description),
+                    duration: safeString(activity.duration),
+                    included: Boolean(activity.included),
+                    price: activity.price || undefined,
+                  }))
+                : generatedActivities,
             bookingConditions: packageData.bookingConditions || {
               cancellationPolicy: "Gratis annuleren tot 14 dagen voor vertrek",
               paymentTerms: "25% aanbetaling bij boeking, restbetaling 6 weken voor vertrek",
