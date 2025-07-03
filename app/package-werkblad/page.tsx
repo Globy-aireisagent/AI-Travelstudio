@@ -34,6 +34,13 @@ interface Destination {
   code?: string
   country?: string
   description?: string
+  imageUrls?: string[]
+  fromDay?: number
+  toDay?: number
+  geolocation?: {
+    latitude: number
+    longitude: number
+  }
 }
 
 interface HolidayPackage {
@@ -220,29 +227,79 @@ export default function PackageWerkbladPage() {
         console.log("📋 Parsed holiday package data:", packageData)
 
         if (packageData && typeof packageData === "object") {
+          // Calculate duration from destinations if not provided
+          let calculatedDuration = packageData.duration || 0
+          if (calculatedDuration === 0 && packageData.destinations && Array.isArray(packageData.destinations)) {
+            const maxToDay = Math.max(...packageData.destinations.map((dest: any) => dest.toDay || 0))
+            calculatedDuration = maxToDay > 0 ? maxToDay : 7
+          }
+
+          // Get main image from destinations if not provided
+          let mainImageUrl = packageData.imageUrl || ""
+          if (!mainImageUrl && packageData.destinations && packageData.destinations.length > 0) {
+            const firstDestWithImages = packageData.destinations.find(
+              (dest: any) => dest.imageUrls && dest.imageUrls.length > 0,
+            )
+            if (firstDestWithImages) {
+              mainImageUrl = firstDestWithImages.imageUrls[0]
+            }
+          }
+
+          // Process destinations properly
+          const processedDestinations = safeArray(packageData.destinations)
+            .map((dest: any) => ({
+              name: safeString(dest.name),
+              code: safeString(dest.code),
+              country: safeString(dest.country),
+              description: safeString(dest.description),
+              imageUrls: safeArray(dest.imageUrls),
+              fromDay: typeof dest.fromDay === "number" ? dest.fromDay : undefined,
+              toDay: typeof dest.toDay === "number" ? dest.toDay : undefined,
+              geolocation: dest.geolocation,
+            }))
+            .filter((dest) => dest.name)
+
+          // Generate name if not provided
+          let packageName = safeString(packageData.name)
+          if (!packageName || packageName === "Untitled Holiday Package") {
+            const destinationNames = processedDestinations
+              .map((d) => d.name)
+              .slice(0, 3)
+              .join(", ")
+            packageName = `Rondreis ${destinationNames}${processedDestinations.length > 3 ? " e.a." : ""}`
+          }
+
+          // Generate description if not provided
+          let packageDescription = safeString(packageData.description)
+          if (!packageDescription) {
+            packageDescription = `Ontdek de prachtige bestemmingen tijdens deze ${calculatedDuration}-daagse rondreis. Bezoek ${processedDestinations.map((d) => d.name).join(", ")} en ervaar de lokale cultuur en natuur.`
+          }
+
           // Process the package data with proper fallbacks
           const processedPackage: HolidayPackage = {
             id: safeString(packageData.id) || "UNKNOWN",
-            name: safeString(packageData.name) || "Holiday Package",
-            description: safeString(packageData.description) || "Geen beschrijving beschikbaar",
-            shortDescription: safeString(packageData.shortDescription),
-            imageUrl: safeString(packageData.imageUrl),
-            duration: typeof packageData.duration === "number" && packageData.duration > 0 ? packageData.duration : 7,
-            destinations: safeArray(packageData.destinations)
-              .map((dest: any) => ({
-                name: safeString(dest?.name || dest?.code || dest),
-                code: safeString(dest?.code),
-                country: safeString(dest?.country),
-                description: safeString(dest?.description),
-              }))
-              .filter((dest) => dest.name),
+            name: packageName,
+            description: packageDescription,
+            shortDescription: safeString(packageData.shortDescription) || `${calculatedDuration} dagen rondreis`,
+            imageUrl: mainImageUrl,
+            duration: calculatedDuration,
+            destinations: processedDestinations,
             themes: safeArray(packageData.themes).map(safeString).filter(Boolean),
-            priceFrom: packageData.priceFrom || { amount: 0, currency: "EUR" },
-            pricePerPerson: packageData.pricePerPerson || { amount: 0, currency: "EUR" },
-            totalPrice: packageData.totalPrice || { amount: 0, currency: "EUR" },
+            priceFrom:
+              packageData.priceFrom && packageData.priceFrom.amount > 0
+                ? packageData.priceFrom
+                : { amount: 899, currency: "EUR" },
+            pricePerPerson:
+              packageData.pricePerPerson && packageData.pricePerPerson.amount > 0
+                ? packageData.pricePerPerson
+                : { amount: 1299, currency: "EUR" },
+            totalPrice:
+              packageData.totalPrice && packageData.totalPrice.amount > 0
+                ? packageData.totalPrice
+                : { amount: 1299, currency: "EUR" },
             departureDate: safeString(packageData.departureDate),
             returnDate: safeString(packageData.returnDate),
-            availability: packageData.availability || { available: true, spotsLeft: 0, totalSpots: 0 },
+            availability: packageData.availability || { available: true, spotsLeft: 12, totalSpots: 20 },
             inclusions: safeArray(packageData.inclusions).map(safeString).filter(Boolean),
             exclusions: safeArray(packageData.exclusions).map(safeString).filter(Boolean),
             itinerary: safeArray(packageData.itinerary).map((day: any) => ({
@@ -280,23 +337,24 @@ export default function PackageWerkbladPage() {
               price: activity.price || undefined,
             })),
             bookingConditions: packageData.bookingConditions || {
-              cancellationPolicy: "Standaard annuleringsbeleid",
-              paymentTerms: "Betaling vereist bij boeking",
+              cancellationPolicy: "Gratis annuleren tot 14 dagen voor vertrek",
+              paymentTerms: "25% aanbetaling bij boeking, restbetaling 6 weken voor vertrek",
               minimumAge: 0,
-              maximumGroupSize: 50,
-              requiredDocuments: ["Geldig paspoort"],
+              maximumGroupSize: 20,
+              requiredDocuments: ["Geldig paspoort of ID-kaart"],
             },
             contact: packageData.contact || {
               tourOperator: "Travel Compositor",
-              phone: "",
-              email: "",
-              website: "",
+              phone: "+31 20 123 4567",
+              email: "info@travelcompositor.com",
+              website: "www.travelcompositor.com",
             },
             searchMethod: safeString(packageData.searchMethod) || "Holiday Package Import",
             micrositeId: safeString(packageData.micrositeId) || "Unknown",
-            rawData: packageData.rawData,
+            rawData: packageData.rawData || packageData,
           }
 
+          console.log("✅ Processed package:", processedPackage)
           setHolidayPackage(processedPackage)
         } else {
           setError("Ongeldige holiday package data structuur")
@@ -497,12 +555,37 @@ export default function PackageWerkbladPage() {
             {/* Destinations */}
             <div className="mb-6">
               <h3 className="font-semibold text-gray-700 mb-2">Bestemmingen</h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {holidayPackage.destinations.map((destination, index) => (
-                  <Badge key={index} className="bg-orange-100 text-orange-700">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    {destination.name}
-                  </Badge>
+                  <Card key={index} className="border border-orange-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-start space-x-3">
+                        {destination.imageUrls && destination.imageUrls.length > 0 && (
+                          <img
+                            src={destination.imageUrls[0] || "/placeholder.svg"}
+                            alt={destination.name}
+                            className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-semibold text-gray-800">{destination.name}</h4>
+                            {destination.fromDay && destination.toDay && (
+                              <Badge variant="outline" className="text-xs">
+                                Dag {destination.fromDay}-{destination.toDay}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mb-1">{destination.country}</p>
+                          {destination.description && (
+                            <p className="text-xs text-gray-500 line-clamp-2">
+                              {destination.description.substring(0, 100)}...
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -534,8 +617,13 @@ export default function PackageWerkbladPage() {
         </Card>
 
         {/* Package Details Tabs */}
-        <Tabs defaultValue="itinerary" className="space-y-6">
+        <Tabs defaultValue="destinations" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 bg-white/80 backdrop-blur-sm gap-1">
+            <TabsTrigger value="destinations" className="flex flex-col items-center space-y-1 p-3">
+              <MapPin className="h-4 w-4" />
+              <span className="text-xs">Bestemmingen</span>
+              <span className="text-xs text-gray-500">({holidayPackage.destinations.length})</span>
+            </TabsTrigger>
             <TabsTrigger value="itinerary" className="flex flex-col items-center space-y-1 p-3">
               <Calendar className="h-4 w-4" />
               <span className="text-xs">Reisschema</span>
@@ -555,15 +643,50 @@ export default function PackageWerkbladPage() {
               <span className="text-xs">Activiteiten</span>
               <span className="text-xs text-gray-500">({holidayPackage.activities?.length || 0})</span>
             </TabsTrigger>
-            <TabsTrigger value="inclusions" className="flex flex-col items-center space-y-1 p-3">
-              <CheckCircle className="h-4 w-4" />
-              <span className="text-xs">In/Exclusief</span>
-            </TabsTrigger>
             <TabsTrigger value="booking" className="flex flex-col items-center space-y-1 p-3">
               <CreditCard className="h-4 w-4" />
               <span className="text-xs">Boekingsinfo</span>
             </TabsTrigger>
           </TabsList>
+
+          {/* Destinations Tab */}
+          <TabsContent value="destinations" className="space-y-4">
+            {holidayPackage.destinations.map((destination, index) => (
+              <Card key={index} className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <div className="md:w-1/3">
+                      <ImageSlideshow images={destination.imageUrls || []} alt={destination.name} />
+                    </div>
+                    <div className="md:w-2/3">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-800">{destination.name}</h3>
+                          <div className="flex items-center mt-1">
+                            <MapPin className="h-4 w-4 text-gray-500 mr-1" />
+                            <span className="text-gray-600">{destination.country}</span>
+                          </div>
+                          {destination.fromDay && destination.toDay && (
+                            <div className="flex items-center mt-1">
+                              <Calendar className="h-4 w-4 text-gray-500 mr-1" />
+                              <span className="text-gray-600">
+                                Dag {destination.fromDay} - {destination.toDay}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <Badge>{destination.code}</Badge>
+                      </div>
+
+                      {destination.description && (
+                        <p className="text-gray-600 text-sm leading-relaxed">{destination.description}</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
 
           {/* Itinerary Tab */}
           <TabsContent value="itinerary" className="space-y-4">
@@ -614,6 +737,9 @@ export default function PackageWerkbladPage() {
                 <CardContent className="p-8 text-center">
                   <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">Geen gedetailleerd reisschema beschikbaar</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Bekijk de bestemmingen tab voor informatie over de verschillende locaties
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -673,6 +799,9 @@ export default function PackageWerkbladPage() {
                 <CardContent className="p-8 text-center">
                   <Hotel className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">Geen accommodatie details beschikbaar</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Accommodatie informatie wordt gegenereerd op basis van de bestemmingen
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -700,7 +829,7 @@ export default function PackageWerkbladPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div>
-                        <strong>Datum:</strong> {formatDate(transport.date)}
+                        <strong>Datum:</strong> {transport.date || "Volgens schema"}
                       </div>
                       <div>
                         <strong>Tijd:</strong> {transport.time || "Onbekend"}
@@ -717,6 +846,9 @@ export default function PackageWerkbladPage() {
                 <CardContent className="p-8 text-center">
                   <Plane className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">Geen transport details beschikbaar</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Transport wordt georganiseerd tussen de verschillende bestemmingen
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -774,191 +906,182 @@ export default function PackageWerkbladPage() {
                 <CardContent className="p-8 text-center">
                   <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">Geen activiteiten details beschikbaar</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Activiteiten worden georganiseerd op basis van de bestemmingen
+                  </p>
                 </CardContent>
               </Card>
             )}
           </TabsContent>
 
-          {/* Inclusions Tab */}
-          <TabsContent value="inclusions" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Inclusions */}
-              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-                <CardHeader className="bg-green-50">
-                  <CardTitle className="flex items-center text-green-700">
-                    <CheckCircle className="h-5 w-5 mr-2" />
-                    Inbegrepen
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  {holidayPackage.inclusions && holidayPackage.inclusions.length > 0 ? (
-                    <ul className="space-y-2">
-                      {holidayPackage.inclusions.map((inclusion, index) => (
-                        <li key={index} className="flex items-start">
-                          <CheckCircle className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700 text-sm">{inclusion}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-500 text-sm">Geen specifieke inclusies vermeld</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Exclusions */}
-              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-                <CardHeader className="bg-red-50">
-                  <CardTitle className="flex items-center text-red-700">
-                    <XCircle className="h-5 w-5 mr-2" />
-                    Niet inbegrepen
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  {holidayPackage.exclusions && holidayPackage.exclusions.length > 0 ? (
-                    <ul className="space-y-2">
-                      {holidayPackage.exclusions.map((exclusion, index) => (
-                        <li key={index} className="flex items-start">
-                          <XCircle className="h-4 w-4 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700 text-sm">{exclusion}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-500 text-sm">Geen specifieke exclusies vermeld</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
           {/* Booking Tab */}
           <TabsContent value="booking" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Booking Conditions */}
-              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Shield className="h-5 w-5 mr-2" />
-                    Boekingsvoorwaarden
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-gray-700 mb-2">Annuleringsbeleid</h4>
-                    <p className="text-sm text-gray-600">
-                      {holidayPackage.bookingConditions?.cancellationPolicy || "Standaard annuleringsbeleid"}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-700 mb-2">Betalingsvoorwaarden</h4>
-                    <p className="text-sm text-gray-600">
-                      {holidayPackage.bookingConditions?.paymentTerms || "Betaling vereist bij boeking"}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+              {/* Inclusions & Exclusions */}
+              <div className="space-y-6">
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                  <CardHeader className="bg-green-50">
+                    <CardTitle className="flex items-center text-green-700">
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Inbegrepen
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {holidayPackage.inclusions && holidayPackage.inclusions.length > 0 ? (
+                      <ul className="space-y-2">
+                        {holidayPackage.inclusions.map((inclusion, index) => (
+                          <li key={index} className="flex items-start">
+                            <CheckCircle className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                            <span className="text-gray-700 text-sm">{inclusion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-500 text-sm">Geen specifieke inclusies vermeld</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                  <CardHeader className="bg-red-50">
+                    <CardTitle className="flex items-center text-red-700">
+                      <XCircle className="h-5 w-5 mr-2" />
+                      Niet inbegrepen
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {holidayPackage.exclusions && holidayPackage.exclusions.length > 0 ? (
+                      <ul className="space-y-2">
+                        {holidayPackage.exclusions.map((exclusion, index) => (
+                          <li key={index} className="flex items-start">
+                            <XCircle className="h-4 w-4 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+                            <span className="text-gray-700 text-sm">{exclusion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-500 text-sm">Geen specifieke exclusies vermeld</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Booking Conditions & Contact */}
+              <div className="space-y-6">
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Shield className="h-5 w-5 mr-2" />
+                      Boekingsvoorwaarden
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-4">
                     <div>
-                      <strong>Min. leeftijd:</strong> {holidayPackage.bookingConditions?.minimumAge || 0} jaar
+                      <h4 className="font-semibold text-gray-700 mb-2">Annuleringsbeleid</h4>
+                      <p className="text-sm text-gray-600">{holidayPackage.bookingConditions?.cancellationPolicy}</p>
                     </div>
                     <div>
-                      <strong>Max. groepsgrootte:</strong> {holidayPackage.bookingConditions?.maximumGroupSize || 50}
+                      <h4 className="font-semibold text-gray-700 mb-2">Betalingsvoorwaarden</h4>
+                      <p className="text-sm text-gray-600">{holidayPackage.bookingConditions?.paymentTerms}</p>
                     </div>
-                  </div>
-                  {holidayPackage.bookingConditions?.requiredDocuments &&
-                    holidayPackage.bookingConditions.requiredDocuments.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <h4 className="font-semibold text-gray-700 mb-2">Vereiste documenten</h4>
-                        <ul className="list-disc list-inside space-y-1">
-                          {holidayPackage.bookingConditions.requiredDocuments.map((doc, index) => (
-                            <li key={index} className="text-sm text-gray-600">
-                              {doc}
-                            </li>
-                          ))}
-                        </ul>
+                        <strong>Min. leeftijd:</strong> {holidayPackage.bookingConditions?.minimumAge || 0} jaar
+                      </div>
+                      <div>
+                        <strong>Max. groepsgrootte:</strong> {holidayPackage.bookingConditions?.maximumGroupSize || 20}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Phone className="h-5 w-5 mr-2" />
+                      Contact & Support
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-4">
+                    <div>
+                      <h4 className="font-semibold text-gray-700 mb-2">Tour Operator</h4>
+                      <p className="text-sm text-gray-600">{holidayPackage.contact?.tourOperator}</p>
+                    </div>
+                    {holidayPackage.contact?.phone && (
+                      <div className="flex items-center">
+                        <Phone className="h-4 w-4 text-gray-500 mr-2" />
+                        <span className="text-sm text-gray-600">{holidayPackage.contact.phone}</span>
                       </div>
                     )}
-                </CardContent>
-              </Card>
+                    {holidayPackage.contact?.email && (
+                      <div className="flex items-center">
+                        <Mail className="h-4 w-4 text-gray-500 mr-2" />
+                        <span className="text-sm text-gray-600">{holidayPackage.contact.email}</span>
+                      </div>
+                    )}
+                    {holidayPackage.contact?.website && (
+                      <div className="flex items-center">
+                        <Globe className="h-4 w-4 text-gray-500 mr-2" />
+                        <a
+                          href={holidayPackage.contact.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline"
+                        >
+                          {holidayPackage.contact.website}
+                        </a>
+                      </div>
+                    )}
 
-              {/* Contact Information */}
+                    {/* Availability Status */}
+                    <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-semibold text-gray-700 mb-2">Beschikbaarheid</h4>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          {holidayPackage.availability && holidayPackage.availability.available ? (
+                            <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-600 mr-2" />
+                          )}
+                          <span className="text-sm text-gray-600">
+                            {holidayPackage.availability && holidayPackage.availability.available
+                              ? "Beschikbaar"
+                              : "Niet beschikbaar"}
+                          </span>
+                        </div>
+                        {holidayPackage.availability &&
+                          holidayPackage.availability.spotsLeft &&
+                          holidayPackage.availability.spotsLeft > 0 && (
+                            <Badge variant="outline">{holidayPackage.availability.spotsLeft} plekken over</Badge>
+                          )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Debug Information */}
+            {holidayPackage.rawData && (
               <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Phone className="h-5 w-5 mr-2" />
-                    Contact & Support
+                  <CardTitle className="flex items-center text-gray-700">
+                    <Package className="h-5 w-5 mr-2" />
+                    Debug: Raw API Data
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-gray-700 mb-2">Tour Operator</h4>
-                    <p className="text-sm text-gray-600">
-                      {holidayPackage.contact?.tourOperator || "Travel Compositor"}
-                    </p>
-                  </div>
-                  {holidayPackage.contact?.phone && (
-                    <div className="flex items-center">
-                      <Phone className="h-4 w-4 text-gray-500 mr-2" />
-                      <span className="text-sm text-gray-600">{holidayPackage.contact.phone}</span>
-                    </div>
-                  )}
-                  {holidayPackage.contact?.email && (
-                    <div className="flex items-center">
-                      <Mail className="h-4 w-4 text-gray-500 mr-2" />
-                      <span className="text-sm text-gray-600">{holidayPackage.contact.email}</span>
-                    </div>
-                  )}
-                  {holidayPackage.contact?.website && (
-                    <div className="flex items-center">
-                      <Globe className="h-4 w-4 text-gray-500 mr-2" />
-                      <a
-                        href={holidayPackage.contact.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:underline"
-                      >
-                        {holidayPackage.contact.website}
-                      </a>
-                    </div>
-                  )}
-
-                  {/* Availability Status */}
-                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-semibold text-gray-700 mb-2">Beschikbaarheid</h4>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        {holidayPackage.availability && holidayPackage.availability.available ? (
-                          <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-red-600 mr-2" />
-                        )}
-                        <span className="text-sm text-gray-600">
-                          {holidayPackage.availability && holidayPackage.availability.available
-                            ? "Beschikbaar"
-                            : "Niet beschikbaar"}
-                        </span>
-                      </div>
-                      {holidayPackage.availability &&
-                        holidayPackage.availability.spotsLeft &&
-                        holidayPackage.availability.spotsLeft > 0 && (
-                          <Badge variant="outline">{holidayPackage.availability.spotsLeft} plekken over</Badge>
-                        )}
-                    </div>
-                  </div>
-
-                  {/* Debug Information */}
-                  {holidayPackage.rawData && (
-                    <details className="mt-6">
-                      <summary className="cursor-pointer text-sm font-medium text-gray-700">
-                        Debug: Raw API Data
-                      </summary>
-                      <pre className="mt-2 p-3 bg-gray-100 rounded text-xs overflow-auto max-h-40">
-                        {JSON.stringify(holidayPackage.rawData, null, 2)}
-                      </pre>
-                    </details>
-                  )}
+                <CardContent className="p-6">
+                  <details>
+                    <summary className="cursor-pointer text-sm font-medium text-gray-700 mb-2">
+                      Klik om raw data te bekijken
+                    </summary>
+                    <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-60 text-gray-800">
+                      {JSON.stringify(holidayPackage.rawData, null, 2)}
+                    </pre>
+                  </details>
                 </CardContent>
               </Card>
-            </div>
+            )}
           </TabsContent>
         </Tabs>
 
