@@ -1,17 +1,8 @@
 "use client"
 import Link from "next/link"
 import { SelectItem } from "@/components/ui/select"
-
-import { SelectContent } from "@/components/ui/select"
-
-import { SelectValue } from "@/components/ui/select"
-
-import { SelectTrigger } from "@/components/ui/select"
-
-import { Select } from "@/components/ui/select"
-
+import { Select, SelectTrigger, SelectValue, SelectContent } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -227,10 +218,11 @@ export default function ImportPage() {
       } else if (selectedImportType === "travel-compositor" && travelCompositorType === "holiday-package") {
         console.log("🏖️ Starting Travel Compositor holiday package import...")
 
-        // Prepare the request data
+        // Prepare the request data - use the correct field names
         const requestData = {
-          packageId: bookingId.trim(), // Using same input field for package ID
-          micrositeId: selectedMicrosite === "auto" ? null : selectedMicrosite,
+          holidayPackageId: bookingId.trim(), // Using bookingId field for package ID
+          micrositeId: selectedMicrosite === "auto" ? "1" : selectedMicrosite, // Always provide a micrositeId
+          config: selectedMicrosite === "auto" ? "1" : selectedMicrosite,
         }
 
         console.log("📤 Sending holiday package request:", requestData)

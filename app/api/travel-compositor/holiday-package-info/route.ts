@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const config = searchParams.get("config") || "1"
 
-    console.log(`📋 Getting holiday package info for config ${config}`)
+    console.log(`🔍 Getting holiday package info for config ${config}`)
 
     // Get credentials based on config
     let username, password, micrositeId
@@ -57,39 +57,29 @@ export async function GET(request: NextRequest) {
     const authData = await authResponse.json()
     const token = authData.token
 
-    console.log(`🔑 Authentication successful, exploring available endpoints`)
+    console.log(`🔑 Authentication successful for microsite ${micrositeId}`)
 
-    const results = {
-      micrositeId,
-      availablePackages: [],
-      availableIdeas: [],
-      availableDestinations: [],
-      endpoints: [],
-    }
-
-    // Try different endpoints to see what's available
-    const endpointsToTry = [
+    // Try to get packages/holiday packages from different endpoints
+    const endpoints = [
       {
-        name: "packages",
-        url: `https://online.travelcompositor.com/resources/packages/${micrositeId}`,
+        url: `https://online.travelcompositor.com/resources/packages/${micrositeId}?lang=nl`,
+        name: "Packages",
       },
       {
-        name: "travel-ideas",
-        url: `https://online.travelcompositor.com/resources/travelideas/${micrositeId}`,
+        url: `https://online.travelcompositor.com/resources/travelideas/${micrositeId}?lang=nl`,
+        name: "Travel Ideas",
       },
       {
-        name: "destinations",
-        url: `https://online.travelcompositor.com/resources/destination/${micrositeId}`,
-      },
-      {
-        name: "accommodations",
-        url: `https://online.travelcompositor.com/resources/accommodations`,
+        url: `https://online.travelcompositor.com/resources/destination/${micrositeId}?lang=nl`,
+        name: "Destinations",
       },
     ]
 
-    for (const endpoint of endpointsToTry) {
+    const results: any = {}
+
+    for (const endpoint of endpoints) {
       try {
-        console.log(`🔍 Trying endpoint: ${endpoint.name}`)
+        console.log(`🔍 Trying ${endpoint.name}: ${endpoint.url}`)
 
         const response = await fetch(endpoint.url, {
           method: "GET",
@@ -102,65 +92,40 @@ export async function GET(request: NextRequest) {
 
         if (response.ok) {
           const data = await response.json()
-          console.log(`✅ ${endpoint.name} success:`, Object.keys(data))
-
-          results.endpoints.push({
-            name: endpoint.name,
-            url: endpoint.url,
-            status: "success",
-            dataKeys: Object.keys(data),
-            sampleData: JSON.stringify(data).substring(0, 500) + "...",
-          })
-
-          // Extract specific data types
-          if (endpoint.name === "packages" && data.packages) {
-            results.availablePackages = data.packages.slice(0, 5).map((pkg: any) => ({
-              id: pkg.id,
-              name: pkg.name,
-              description: pkg.description?.substring(0, 100),
-            }))
+          results[endpoint.name] = {
+            success: true,
+            data: data,
+            count: Array.isArray(data) ? data.length : Object.keys(data).length,
+            sampleIds: Array.isArray(data)
+              ? data.slice(0, 5).map((item: any) => item.id || item.packageId || item.ideaId)
+              : [data.id || data.packageId || data.ideaId],
           }
-
-          if (endpoint.name === "travel-ideas" && data.travelIdeas) {
-            results.availableIdeas = data.travelIdeas.slice(0, 5).map((idea: any) => ({
-              id: idea.id,
-              name: idea.name,
-              description: idea.description?.substring(0, 100),
-            }))
-          }
-
-          if (endpoint.name === "destinations" && data.destination) {
-            results.availableDestinations = data.destination.slice(0, 10).map((dest: any) => ({
-              id: dest.id,
-              name: dest.name,
-              country: dest.country,
-            }))
-          }
+          console.log(`✅ ${endpoint.name} success: ${results[endpoint.name].count} items`)
         } else {
-          console.log(`❌ ${endpoint.name} failed: ${response.status}`)
-          results.endpoints.push({
-            name: endpoint.name,
-            url: endpoint.url,
-            status: "failed",
+          results[endpoint.name] = {
+            success: false,
             error: `HTTP ${response.status}`,
-          })
+          }
+          console.log(`❌ ${endpoint.name} failed: ${response.status}`)
         }
       } catch (error) {
-        console.log(`❌ ${endpoint.name} error:`, error)
-        results.endpoints.push({
-          name: endpoint.name,
-          url: endpoint.url,
-          status: "error",
+        results[endpoint.name] = {
+          success: false,
           error: error instanceof Error ? error.message : "Unknown error",
-        })
+        }
+        console.log(`❌ ${endpoint.name} error:`, error)
       }
     }
 
-    console.log("📊 Holiday package info results:", results)
-
     return NextResponse.json({
       success: true,
-      data: results,
+      micrositeId,
+      config,
+      endpoints: results,
+      availablePackageIds: [
+        ...(results.Packages?.sampleIds || []),
+        ...(results["Travel Ideas"]?.sampleIds || []),
+      ].filter(Boolean),
     })
   } catch (error) {
     console.error("❌ Error getting holiday package info:", error)
