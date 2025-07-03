@@ -4,8 +4,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const config = searchParams.get("config") || "1"
+    const lang = searchParams.get("lang") || "nl"
 
-    console.log(`🔍 Getting holiday package info for config ${config}`)
+    console.log(`🏖️ Getting holiday package info for config ${config}`)
 
     // Get credentials based on config
     let username, password, micrositeId
@@ -59,19 +60,19 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔑 Authentication successful for microsite ${micrositeId}`)
 
-    // Try to get packages/holiday packages from different endpoints
+    // Try different endpoints to get holiday package information
     const endpoints = [
       {
-        url: `https://online.travelcompositor.com/resources/packages/${micrositeId}?lang=nl`,
-        name: "Packages",
+        url: `https://online.travelcompositor.com/resources/packages/${micrositeId}?lang=${lang}`,
+        name: "packages",
       },
       {
-        url: `https://online.travelcompositor.com/resources/travelideas/${micrositeId}?lang=nl`,
-        name: "Travel Ideas",
+        url: `https://online.travelcompositor.com/resources/travelideas/${micrositeId}?lang=${lang}`,
+        name: "travel ideas",
       },
       {
-        url: `https://online.travelcompositor.com/resources/destination/${micrositeId}?lang=nl`,
-        name: "Destinations",
+        url: `https://online.travelcompositor.com/resources/destination/${micrositeId}?lang=${lang}`,
+        name: "destinations",
       },
     ]
 
@@ -96,11 +97,8 @@ export async function GET(request: NextRequest) {
             success: true,
             data: data,
             count: Array.isArray(data) ? data.length : Object.keys(data).length,
-            sampleIds: Array.isArray(data)
-              ? data.slice(0, 5).map((item: any) => item.id || item.packageId || item.ideaId)
-              : [data.id || data.packageId || data.ideaId],
           }
-          console.log(`✅ ${endpoint.name} success: ${results[endpoint.name].count} items`)
+          console.log(`✅ ${endpoint.name}: ${results[endpoint.name].count} items`)
         } else {
           results[endpoint.name] = {
             success: false,
@@ -121,11 +119,15 @@ export async function GET(request: NextRequest) {
       success: true,
       micrositeId,
       config,
-      endpoints: results,
-      availablePackageIds: [
-        ...(results.Packages?.sampleIds || []),
-        ...(results["Travel Ideas"]?.sampleIds || []),
-      ].filter(Boolean),
+      results,
+      summary: {
+        packagesAvailable: results.packages?.success || false,
+        travelIdeasAvailable: results["travel ideas"]?.success || false,
+        destinationsAvailable: results.destinations?.success || false,
+        totalPackages: results.packages?.count || 0,
+        totalTravelIdeas: results["travel ideas"]?.count || 0,
+        totalDestinations: results.destinations?.count || 0,
+      },
     })
   } catch (error) {
     console.error("❌ Error getting holiday package info:", error)
