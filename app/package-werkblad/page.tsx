@@ -231,7 +231,7 @@ export default function PackageWerkbladPage() {
           let calculatedDuration = packageData.duration || 0
           if (calculatedDuration === 0 && packageData.destinations && Array.isArray(packageData.destinations)) {
             const maxToDay = Math.max(...packageData.destinations.map((dest: any) => dest.toDay || 0))
-            calculatedDuration = maxToDay > 0 ? maxToDay : 7
+            calculatedDuration = maxToDay > 0 ? maxToDay : 0
           }
 
           // Get main image from destinations if not provided
@@ -259,196 +259,75 @@ export default function PackageWerkbladPage() {
             }))
             .filter((dest) => dest.name)
 
-          // Generate realistic accommodations based on destinations
-          const generatedAccommodations = processedDestinations.map((dest, index) => ({
-            name: `Hotel ${dest.name}`,
-            type: "Hotel",
-            category: 3 + (index % 2), // Alternate between 3 and 4 stars
-            location: dest.name,
-            description: `Comfortabel hotel gelegen in het centrum van ${dest.name}. ${dest.description ? dest.description.substring(0, 100) + "..." : ""}`,
-            amenities: ["WiFi", "Airconditioning", "Restaurant", "Bar", "Zwembad", "Parkeren"],
-            images: dest.imageUrls || [],
-          }))
-
-          // Generate realistic transport based on destinations
-          const generatedTransports = []
-          for (let i = 0; i < processedDestinations.length - 1; i++) {
-            const from = processedDestinations[i]
-            const to = processedDestinations[i + 1]
-            generatedTransports.push({
-              type: "Privé transfer",
-              from: from.name,
-              to: to.name,
-              date: `Dag ${from.toDay}`,
-              time: "10:00",
-              duration: "2-3 uur",
-              company: "Lokale transport partner",
-            })
-          }
-
-          // Generate realistic activities based on destinations
-          const generatedActivities = processedDestinations.flatMap((dest) => [
-            {
-              name: `Stadswandeling ${dest.name}`,
-              type: "Sightseeing",
-              description: `Ontdek de hoogtepunten van ${dest.name} tijdens een begeleide wandeling met lokale gids.`,
-              duration: "2-3 uur",
-              included: true,
-            },
-            {
-              name: `Vrije tijd in ${dest.name}`,
-              type: "Vrije tijd",
-              description: `Tijd om ${dest.name} op eigen gelegenheid te verkennen en te genieten van de lokale sfeer.`,
-              duration: "Halve dag",
-              included: true,
-            },
-          ])
-
-          // Generate itinerary based on destinations
-          const generatedItinerary = processedDestinations.map((dest) => ({
-            day: dest.fromDay || 1,
-            title: `Dag ${dest.fromDay}-${dest.toDay}: ${dest.name}`,
-            description: dest.description || `Verken de prachtige stad ${dest.name} en omgeving.`,
-            activities: [
-              `Aankomst in ${dest.name}`,
-              "Check-in hotel",
-              `Stadswandeling ${dest.name}`,
-              "Vrije tijd voor eigen verkenning",
-            ],
-            accommodation: `Hotel ${dest.name}`,
-            meals: ["Ontbijt"],
-          }))
-
-          // Generate realistic inclusions and exclusions
-          const generatedInclusions = [
-            "Accommodatie in geselecteerde hotels (3-4 sterren)",
-            "Ontbijt dagelijks",
-            "Alle transfers tussen bestemmingen",
-            "Nederlandstalige reisleiding",
-            "Stadsrondleidingen in alle bestemmingen",
-            "Alle lokale belastingen",
-          ]
-
-          const generatedExclusions = [
-            "Vluchten naar/van Kroatië",
-            "Lunch en diner (tenzij anders vermeld)",
-            "Persoonlijke uitgaven en souvenirs",
-            "Fooien voor gidsen en chauffeurs",
-            "Reisverzekering",
-            "Optionele excursies",
-          ]
-
-          // Generate name if not provided
-          let packageName = safeString(packageData.name)
-          if (!packageName || packageName === "Untitled Holiday Package") {
-            const destinationNames = processedDestinations
-              .map((d) => d.name)
-              .slice(0, 3)
-              .join(", ")
-            packageName = `Rondreis ${destinationNames}${processedDestinations.length > 3 ? " e.a." : ""}`
-          }
-
-          // Generate description if not provided
-          let packageDescription = safeString(packageData.description)
-          if (!packageDescription) {
-            packageDescription = `Ontdek de prachtige bestemmingen tijdens deze ${calculatedDuration}-daagse rondreis. Bezoek ${processedDestinations.map((d) => d.name).join(", ")} en ervaar de lokale cultuur en natuur.`
-          }
-
-          // Process the package data with proper fallbacks
+          // Only use actual API data - no fallbacks
           const processedPackage: HolidayPackage = {
-            id: safeString(packageData.id) || "UNKNOWN",
-            name: packageName,
-            description: packageDescription,
-            shortDescription: safeString(packageData.shortDescription) || `${calculatedDuration} dagen rondreis`,
+            id: safeString(packageData.id),
+            name: safeString(packageData.name),
+            description: safeString(packageData.description),
+            shortDescription: safeString(packageData.shortDescription),
             imageUrl: mainImageUrl,
             duration: calculatedDuration,
             destinations: processedDestinations,
             themes: safeArray(packageData.themes).map(safeString).filter(Boolean),
-            priceFrom:
-              packageData.priceFrom && packageData.priceFrom.amount > 0
-                ? packageData.priceFrom
-                : { amount: 899, currency: "EUR" },
+            priceFrom: packageData.priceFrom && packageData.priceFrom.amount > 0 ? packageData.priceFrom : undefined,
             pricePerPerson:
               packageData.pricePerPerson && packageData.pricePerPerson.amount > 0
                 ? packageData.pricePerPerson
-                : { amount: 1299, currency: "EUR" },
+                : undefined,
             totalPrice:
-              packageData.totalPrice && packageData.totalPrice.amount > 0
-                ? packageData.totalPrice
-                : { amount: 1299, currency: "EUR" },
+              packageData.totalPrice && packageData.totalPrice.amount > 0 ? packageData.totalPrice : undefined,
             departureDate: safeString(packageData.departureDate),
             returnDate: safeString(packageData.returnDate),
-            availability: packageData.availability || { available: true, spotsLeft: 12, totalSpots: 20 },
-            inclusions:
-              packageData.inclusions && packageData.inclusions.length > 0
-                ? safeArray(packageData.inclusions).map(safeString).filter(Boolean)
-                : generatedInclusions,
-            exclusions:
-              packageData.exclusions && packageData.exclusions.length > 0
-                ? safeArray(packageData.exclusions).map(safeString).filter(Boolean)
-                : generatedExclusions,
-            itinerary:
-              packageData.itinerary && packageData.itinerary.length > 0
-                ? safeArray(packageData.itinerary).map((day: any) => ({
-                    day: typeof day.day === "number" ? day.day : 0,
-                    title: safeString(day.title) || `Dag ${day.day || 1}`,
-                    description: safeString(day.description) || "",
-                    activities: safeArray(day.activities).map(safeString).filter(Boolean),
-                    accommodation: safeString(day.accommodation),
-                    meals: safeArray(day.meals).map(safeString).filter(Boolean),
-                  }))
-                : generatedItinerary,
-            accommodations:
-              packageData.accommodations && packageData.accommodations.length > 0
-                ? safeArray(packageData.accommodations).map((acc: any) => ({
-                    name: safeString(acc.name) || "Accommodatie",
-                    type: safeString(acc.type) || "Hotel",
-                    category: typeof acc.category === "number" ? acc.category : 3,
-                    location: safeString(acc.location) || "Onbekende locatie",
-                    description: safeString(acc.description),
-                    amenities: safeArray(acc.amenities).map(safeString).filter(Boolean),
-                    images: safeArray(acc.images).map(safeString).filter(Boolean),
-                  }))
-                : generatedAccommodations,
-            transports:
-              packageData.transports && packageData.transports.length > 0
-                ? safeArray(packageData.transports).map((transport: any) => ({
-                    type: safeString(transport.type) || "Transport",
-                    from: safeString(transport.from) || "Vertrekpunt",
-                    to: safeString(transport.to) || "Bestemming",
-                    date: safeString(transport.date),
-                    time: safeString(transport.time),
-                    duration: safeString(transport.duration),
-                    company: safeString(transport.company),
-                  }))
-                : generatedTransports,
-            activities:
-              packageData.activities && packageData.activities.length > 0
-                ? safeArray(packageData.activities).map((activity: any) => ({
-                    name: safeString(activity.name) || "Activiteit",
-                    type: safeString(activity.type) || "Excursie",
-                    description: safeString(activity.description),
-                    duration: safeString(activity.duration),
-                    included: Boolean(activity.included),
-                    price: activity.price || undefined,
-                  }))
-                : generatedActivities,
-            bookingConditions: packageData.bookingConditions || {
-              cancellationPolicy: "Gratis annuleren tot 14 dagen voor vertrek",
-              paymentTerms: "25% aanbetaling bij boeking, restbetaling 6 weken voor vertrek",
-              minimumAge: 0,
-              maximumGroupSize: 20,
-              requiredDocuments: ["Geldig paspoort of ID-kaart"],
-            },
-            contact: packageData.contact || {
-              tourOperator: "Travel Compositor",
-              phone: "+31 20 123 4567",
-              email: "info@travelcompositor.com",
-              website: "www.travelcompositor.com",
-            },
-            searchMethod: safeString(packageData.searchMethod) || "Holiday Package Import",
-            micrositeId: safeString(packageData.micrositeId) || "Unknown",
-            rawData: packageData.rawData || packageData,
+            availability: packageData.availability,
+            inclusions: safeArray(packageData.inclusions).map(safeString).filter(Boolean),
+            exclusions: safeArray(packageData.exclusions).map(safeString).filter(Boolean),
+            itinerary: safeArray(packageData.itinerary)
+              .map((day: any) => ({
+                day: typeof day.day === "number" ? day.day : 0,
+                title: safeString(day.title),
+                description: safeString(day.description),
+                activities: safeArray(day.activities).map(safeString).filter(Boolean),
+                accommodation: safeString(day.accommodation),
+                meals: safeArray(day.meals).map(safeString).filter(Boolean),
+              }))
+              .filter((day) => day.title || day.description),
+            accommodations: safeArray(packageData.accommodations)
+              .map((acc: any) => ({
+                name: safeString(acc.name),
+                type: safeString(acc.type),
+                category: typeof acc.category === "number" ? acc.category : undefined,
+                location: safeString(acc.location),
+                description: safeString(acc.description),
+                amenities: safeArray(acc.amenities).map(safeString).filter(Boolean),
+                images: safeArray(acc.images).map(safeString).filter(Boolean),
+              }))
+              .filter((acc) => acc.name),
+            transports: safeArray(packageData.transports)
+              .map((transport: any) => ({
+                type: safeString(transport.type),
+                from: safeString(transport.from),
+                to: safeString(transport.to),
+                date: safeString(transport.date),
+                time: safeString(transport.time),
+                duration: safeString(transport.duration),
+                company: safeString(transport.company),
+              }))
+              .filter((transport) => transport.type || transport.from || transport.to),
+            activities: safeArray(packageData.activities)
+              .map((activity: any) => ({
+                name: safeString(activity.name),
+                type: safeString(activity.type),
+                description: safeString(activity.description),
+                duration: safeString(activity.duration),
+                included: Boolean(activity.included),
+                price: activity.price,
+              }))
+              .filter((activity) => activity.name),
+            bookingConditions: packageData.bookingConditions,
+            contact: packageData.contact,
+            searchMethod: safeString(packageData.searchMethod),
+            micrositeId: safeString(packageData.micrositeId),
+            rawData: packageData,
           }
 
           console.log("✅ Processed package:", processedPackage)
@@ -514,7 +393,7 @@ export default function PackageWerkbladPage() {
   }
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return "Onbekend"
+    if (!dateString) return "Niet opgegeven"
     try {
       return new Date(dateString).toLocaleDateString("nl-NL", {
         weekday: "long",
@@ -528,7 +407,7 @@ export default function PackageWerkbladPage() {
   }
 
   const formatPrice = (price?: { amount: number; currency: string }) => {
-    if (!price || price.amount === 0) return "Prijs op aanvraag"
+    if (!price || price.amount === 0) return "Niet opgegeven"
     return `${price.currency === "EUR" ? "€" : price.currency}${price.amount.toLocaleString()}`
   }
 
@@ -547,7 +426,7 @@ export default function PackageWerkbladPage() {
                   Holiday Package Werkblad
                 </h1>
                 <p className="text-sm text-gray-600">
-                  {holidayPackage.id} • Geïmporteerd via {holidayPackage.searchMethod}
+                  {holidayPackage.id} • {holidayPackage.searchMethod || "Travel Compositor"}
                 </p>
               </div>
             </div>
@@ -578,16 +457,20 @@ export default function PackageWerkbladPage() {
           <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-t-lg">
             <div className="flex justify-between items-start">
               <div>
-                <CardTitle className="text-2xl mb-2">{holidayPackage.name}</CardTitle>
+                <CardTitle className="text-2xl mb-2">
+                  {holidayPackage.name || `Holiday Package ${holidayPackage.id}`}
+                </CardTitle>
                 <div className="flex items-center space-x-4 text-orange-100">
                   <div className="flex items-center">
                     <MapPin className="h-4 w-4 mr-1" />
                     {holidayPackage.destinations.length} bestemmingen
                   </div>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    {holidayPackage.duration} dagen
-                  </div>
+                  {holidayPackage.duration > 0 && (
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-1" />
+                      {holidayPackage.duration} dagen
+                    </div>
+                  )}
                   <div className="flex items-center">
                     <Calendar className="h-4 w-4 mr-1" />
                     {formatDate(holidayPackage.departureDate)}
@@ -595,25 +478,31 @@ export default function PackageWerkbladPage() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold">{formatPrice(holidayPackage.totalPrice)}</div>
-                {holidayPackage.pricePerPerson && holidayPackage.pricePerPerson.amount > 0 && (
+                {holidayPackage.totalPrice ? (
+                  <div className="text-3xl font-bold">{formatPrice(holidayPackage.totalPrice)}</div>
+                ) : (
+                  <div className="text-xl text-orange-100">Prijs op aanvraag</div>
+                )}
+                {holidayPackage.pricePerPerson && (
                   <div className="text-sm text-orange-100">
                     {formatPrice(holidayPackage.pricePerPerson)} per persoon
                   </div>
                 )}
-                <div className="flex items-center mt-2">
-                  {holidayPackage.availability && holidayPackage.availability.available ? (
-                    <Badge className="bg-green-500/20 text-green-100">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Beschikbaar
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-red-500/20 text-red-100">
-                      <XCircle className="h-3 w-3 mr-1" />
-                      Niet beschikbaar
-                    </Badge>
-                  )}
-                </div>
+                {holidayPackage.availability && (
+                  <div className="flex items-center mt-2">
+                    {holidayPackage.availability.available ? (
+                      <Badge className="bg-green-500/20 text-green-100">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Beschikbaar
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-red-500/20 text-red-100">
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Niet beschikbaar
+                      </Badge>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -623,17 +512,19 @@ export default function PackageWerkbladPage() {
               <div className="mb-6">
                 <img
                   src={holidayPackage.imageUrl || "/placeholder.svg"}
-                  alt={holidayPackage.name}
+                  alt={holidayPackage.name || "Holiday Package"}
                   className="w-full h-64 object-cover rounded-lg shadow-md"
                 />
               </div>
             )}
 
             {/* Description */}
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-700 mb-2">Beschrijving</h3>
-              <p className="text-gray-600">{holidayPackage.description}</p>
-            </div>
+            {holidayPackage.description && (
+              <div className="mb-6">
+                <h3 className="font-semibold text-gray-700 mb-2">Beschrijving</h3>
+                <p className="text-gray-600">{holidayPackage.description}</p>
+              </div>
+            )}
 
             {/* Themes */}
             {holidayPackage.themes && holidayPackage.themes.length > 0 && (
@@ -673,7 +564,7 @@ export default function PackageWerkbladPage() {
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600 mb-1">{destination.country}</p>
+                          {destination.country && <p className="text-sm text-gray-600 mb-1">{destination.country}</p>}
                           {destination.description && (
                             <p className="text-xs text-gray-500 line-clamp-2">
                               {destination.description.substring(0, 100)}...
@@ -706,7 +597,7 @@ export default function PackageWerkbladPage() {
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
                 <Clock className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-orange-600">{holidayPackage.duration}</div>
+                <div className="text-2xl font-bold text-orange-600">{holidayPackage.duration || 0}</div>
                 <div className="text-sm text-gray-600">Dagen</div>
               </div>
             </div>
@@ -759,10 +650,12 @@ export default function PackageWerkbladPage() {
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <h3 className="text-xl font-bold text-gray-800">{destination.name}</h3>
-                          <div className="flex items-center mt-1">
-                            <MapPin className="h-4 w-4 text-gray-500 mr-1" />
-                            <span className="text-gray-600">{destination.country}</span>
-                          </div>
+                          {destination.country && (
+                            <div className="flex items-center mt-1">
+                              <MapPin className="h-4 w-4 text-gray-500 mr-1" />
+                              <span className="text-gray-600">{destination.country}</span>
+                            </div>
+                          )}
                           {destination.fromDay && destination.toDay && (
                             <div className="flex items-center mt-1">
                               <Calendar className="h-4 w-4 text-gray-500 mr-1" />
@@ -772,7 +665,7 @@ export default function PackageWerkbladPage() {
                             </div>
                           )}
                         </div>
-                        <Badge>{destination.code}</Badge>
+                        {destination.code && <Badge>{destination.code}</Badge>}
                       </div>
 
                       {destination.description && (
@@ -798,7 +691,7 @@ export default function PackageWerkbladPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-4">
-                      <p className="text-gray-600">{day.description}</p>
+                      {day.description && <p className="text-gray-600">{day.description}</p>}
 
                       {day.activities && day.activities.length > 0 && (
                         <div>
@@ -833,7 +726,7 @@ export default function PackageWerkbladPage() {
               <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                 <CardContent className="p-8 text-center">
                   <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">Geen gedetailleerd reisschema beschikbaar</p>
+                  <p className="text-gray-600">Geen reisschema beschikbaar in Travel Compositor</p>
                   <p className="text-sm text-gray-500 mt-2">
                     Bekijk de bestemmingen tab voor informatie over de verschillende locaties
                   </p>
@@ -862,12 +755,14 @@ export default function PackageWerkbladPage() {
                                 <span className="text-gray-600">{accommodation.category} sterren</span>
                               </div>
                             )}
-                            <div className="flex items-center mt-1">
-                              <MapPin className="h-4 w-4 text-gray-500 mr-1" />
-                              <span className="text-gray-600">{accommodation.location}</span>
-                            </div>
+                            {accommodation.location && (
+                              <div className="flex items-center mt-1">
+                                <MapPin className="h-4 w-4 text-gray-500 mr-1" />
+                                <span className="text-gray-600">{accommodation.location}</span>
+                              </div>
+                            )}
                           </div>
-                          <Badge>{accommodation.type}</Badge>
+                          {accommodation.type && <Badge>{accommodation.type}</Badge>}
                         </div>
 
                         {accommodation.description && (
@@ -895,10 +790,7 @@ export default function PackageWerkbladPage() {
               <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                 <CardContent className="p-8 text-center">
                   <Hotel className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">Geen accommodatie details beschikbaar</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Accommodatie informatie wordt gegenereerd op basis van de bestemmingen
-                  </p>
+                  <p className="text-gray-600">Geen accommodatie details beschikbaar in Travel Compositor</p>
                 </CardContent>
               </Card>
             )}
@@ -925,15 +817,21 @@ export default function PackageWerkbladPage() {
                       {transport.company && <Badge className="mt-1">{transport.company}</Badge>}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <strong>Datum:</strong> {transport.date || "Volgens schema"}
-                      </div>
-                      <div>
-                        <strong>Tijd:</strong> {transport.time || "Onbekend"}
-                      </div>
-                      <div>
-                        <strong>Duur:</strong> {transport.duration || "Onbekend"}
-                      </div>
+                      {transport.date && (
+                        <div>
+                          <strong>Datum:</strong> {transport.date}
+                        </div>
+                      )}
+                      {transport.time && (
+                        <div>
+                          <strong>Tijd:</strong> {transport.time}
+                        </div>
+                      )}
+                      {transport.duration && (
+                        <div>
+                          <strong>Duur:</strong> {transport.duration}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -942,10 +840,7 @@ export default function PackageWerkbladPage() {
               <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                 <CardContent className="p-8 text-center">
                   <Plane className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">Geen transport details beschikbaar</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Transport wordt georganiseerd tussen de verschillende bestemmingen
-                  </p>
+                  <p className="text-gray-600">Geen transport details beschikbaar in Travel Compositor</p>
                 </CardContent>
               </Card>
             )}
@@ -960,10 +855,12 @@ export default function PackageWerkbladPage() {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="text-xl font-bold text-gray-800">{activity.name}</h3>
-                        <div className="flex items-center mt-1">
-                          <Camera className="h-4 w-4 text-gray-500 mr-1" />
-                          <span className="text-gray-600">{activity.type}</span>
-                        </div>
+                        {activity.type && (
+                          <div className="flex items-center mt-1">
+                            <Camera className="h-4 w-4 text-gray-500 mr-1" />
+                            <span className="text-gray-600">{activity.type}</span>
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
                         {activity.included ? (
@@ -987,12 +884,16 @@ export default function PackageWerkbladPage() {
                     <div className="space-y-2">
                       {activity.description && <p className="text-gray-600 text-sm">{activity.description}</p>}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <strong>Duur:</strong> {activity.duration || "Onbekend"}
-                        </div>
-                        <div>
-                          <strong>Type:</strong> {activity.type}
-                        </div>
+                        {activity.duration && (
+                          <div>
+                            <strong>Duur:</strong> {activity.duration}
+                          </div>
+                        )}
+                        {activity.type && (
+                          <div>
+                            <strong>Type:</strong> {activity.type}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1002,10 +903,7 @@ export default function PackageWerkbladPage() {
               <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                 <CardContent className="p-8 text-center">
                   <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">Geen activiteiten details beschikbaar</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Activiteiten worden georganiseerd op basis van de bestemmingen
-                  </p>
+                  <p className="text-gray-600">Geen activiteiten details beschikbaar in Travel Compositor</p>
                 </CardContent>
               </Card>
             )}
@@ -1034,7 +932,7 @@ export default function PackageWerkbladPage() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-gray-500 text-sm">Geen specifieke inclusies vermeld</p>
+                      <p className="text-gray-500 text-sm">Geen inclusies opgegeven in Travel Compositor</p>
                     )}
                   </CardContent>
                 </Card>
@@ -1057,7 +955,7 @@ export default function PackageWerkbladPage() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-gray-500 text-sm">Geen specifieke exclusies vermeld</p>
+                      <p className="text-gray-500 text-sm">Geen exclusies opgegeven in Travel Compositor</p>
                     )}
                   </CardContent>
                 </Card>
@@ -1073,22 +971,38 @@ export default function PackageWerkbladPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-4">
-                    <div>
-                      <h4 className="font-semibold text-gray-700 mb-2">Annuleringsbeleid</h4>
-                      <p className="text-sm text-gray-600">{holidayPackage.bookingConditions?.cancellationPolicy}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-700 mb-2">Betalingsvoorwaarden</h4>
-                      <p className="text-sm text-gray-600">{holidayPackage.bookingConditions?.paymentTerms}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <strong>Min. leeftijd:</strong> {holidayPackage.bookingConditions?.minimumAge || 0} jaar
-                      </div>
-                      <div>
-                        <strong>Max. groepsgrootte:</strong> {holidayPackage.bookingConditions?.maximumGroupSize || 20}
-                      </div>
-                    </div>
+                    {holidayPackage.bookingConditions ? (
+                      <>
+                        {holidayPackage.bookingConditions.cancellationPolicy && (
+                          <div>
+                            <h4 className="font-semibold text-gray-700 mb-2">Annuleringsbeleid</h4>
+                            <p className="text-sm text-gray-600">
+                              {holidayPackage.bookingConditions.cancellationPolicy}
+                            </p>
+                          </div>
+                        )}
+                        {holidayPackage.bookingConditions.paymentTerms && (
+                          <div>
+                            <h4 className="font-semibold text-gray-700 mb-2">Betalingsvoorwaarden</h4>
+                            <p className="text-sm text-gray-600">{holidayPackage.bookingConditions.paymentTerms}</p>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          {holidayPackage.bookingConditions.minimumAge !== undefined && (
+                            <div>
+                              <strong>Min. leeftijd:</strong> {holidayPackage.bookingConditions.minimumAge} jaar
+                            </div>
+                          )}
+                          {holidayPackage.bookingConditions.maximumGroupSize !== undefined && (
+                            <div>
+                              <strong>Max. groepsgrootte:</strong> {holidayPackage.bookingConditions.maximumGroupSize}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-gray-500 text-sm">Geen boekingsvoorwaarden opgegeven in Travel Compositor</p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -1100,59 +1014,65 @@ export default function PackageWerkbladPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-4">
-                    <div>
-                      <h4 className="font-semibold text-gray-700 mb-2">Tour Operator</h4>
-                      <p className="text-sm text-gray-600">{holidayPackage.contact?.tourOperator}</p>
-                    </div>
-                    {holidayPackage.contact?.phone && (
-                      <div className="flex items-center">
-                        <Phone className="h-4 w-4 text-gray-500 mr-2" />
-                        <span className="text-sm text-gray-600">{holidayPackage.contact.phone}</span>
-                      </div>
-                    )}
-                    {holidayPackage.contact?.email && (
-                      <div className="flex items-center">
-                        <Mail className="h-4 w-4 text-gray-500 mr-2" />
-                        <span className="text-sm text-gray-600">{holidayPackage.contact.email}</span>
-                      </div>
-                    )}
-                    {holidayPackage.contact?.website && (
-                      <div className="flex items-center">
-                        <Globe className="h-4 w-4 text-gray-500 mr-2" />
-                        <a
-                          href={holidayPackage.contact.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:underline"
-                        >
-                          {holidayPackage.contact.website}
-                        </a>
-                      </div>
+                    {holidayPackage.contact ? (
+                      <>
+                        {holidayPackage.contact.tourOperator && (
+                          <div>
+                            <h4 className="font-semibold text-gray-700 mb-2">Tour Operator</h4>
+                            <p className="text-sm text-gray-600">{holidayPackage.contact.tourOperator}</p>
+                          </div>
+                        )}
+                        {holidayPackage.contact.phone && (
+                          <div className="flex items-center">
+                            <Phone className="h-4 w-4 text-gray-500 mr-2" />
+                            <span className="text-sm text-gray-600">{holidayPackage.contact.phone}</span>
+                          </div>
+                        )}
+                        {holidayPackage.contact.email && (
+                          <div className="flex items-center">
+                            <Mail className="h-4 w-4 text-gray-500 mr-2" />
+                            <span className="text-sm text-gray-600">{holidayPackage.contact.email}</span>
+                          </div>
+                        )}
+                        {holidayPackage.contact.website && (
+                          <div className="flex items-center">
+                            <Globe className="h-4 w-4 text-gray-500 mr-2" />
+                            <a
+                              href={holidayPackage.contact.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:underline"
+                            >
+                              {holidayPackage.contact.website}
+                            </a>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-gray-500 text-sm">Geen contactgegevens opgegeven in Travel Compositor</p>
                     )}
 
                     {/* Availability Status */}
-                    <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                      <h4 className="font-semibold text-gray-700 mb-2">Beschikbaarheid</h4>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          {holidayPackage.availability && holidayPackage.availability.available ? (
-                            <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-red-600 mr-2" />
-                          )}
-                          <span className="text-sm text-gray-600">
-                            {holidayPackage.availability && holidayPackage.availability.available
-                              ? "Beschikbaar"
-                              : "Niet beschikbaar"}
-                          </span>
-                        </div>
-                        {holidayPackage.availability &&
-                          holidayPackage.availability.spotsLeft &&
-                          holidayPackage.availability.spotsLeft > 0 && (
+                    {holidayPackage.availability && (
+                      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                        <h4 className="font-semibold text-gray-700 mb-2">Beschikbaarheid</h4>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            {holidayPackage.availability.available ? (
+                              <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-red-600 mr-2" />
+                            )}
+                            <span className="text-sm text-gray-600">
+                              {holidayPackage.availability.available ? "Beschikbaar" : "Niet beschikbaar"}
+                            </span>
+                          </div>
+                          {holidayPackage.availability.spotsLeft && holidayPackage.availability.spotsLeft > 0 && (
                             <Badge variant="outline">{holidayPackage.availability.spotsLeft} plekken over</Badge>
                           )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1164,13 +1084,13 @@ export default function PackageWerkbladPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center text-gray-700">
                     <Package className="h-5 w-5 mr-2" />
-                    Debug: Raw API Data
+                    Debug: Raw Travel Compositor Data
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                   <details>
                     <summary className="cursor-pointer text-sm font-medium text-gray-700 mb-2">
-                      Klik om raw data te bekijken
+                      Klik om raw data uit Travel Compositor te bekijken
                     </summary>
                     <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-60 text-gray-800">
                       {JSON.stringify(holidayPackage.rawData, null, 2)}
