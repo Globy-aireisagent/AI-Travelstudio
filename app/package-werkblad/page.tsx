@@ -29,6 +29,13 @@ import {
   ChevronRight,
 } from "lucide-react"
 
+interface Destination {
+  name: string
+  code?: string
+  country?: string
+  description?: string
+}
+
 interface HolidayPackage {
   id: string
   name: string
@@ -36,7 +43,7 @@ interface HolidayPackage {
   shortDescription?: string
   imageUrl?: string
   duration: number
-  destinations: string[]
+  destinations: Destination[]
   themes?: string[]
   priceFrom?: {
     amount: number
@@ -111,6 +118,7 @@ interface HolidayPackage {
   }
   searchMethod?: string
   micrositeId?: string
+  rawData?: any
 }
 
 // Safe string conversion function
@@ -119,13 +127,6 @@ const safeString = (value: any): string => {
   if (typeof value === "string") return value
   if (typeof value === "number") return value.toString()
   if (typeof value === "boolean") return value ? "Ja" : "Nee"
-  if (typeof value === "object") {
-    // Handle objects by converting to JSON or extracting meaningful info
-    if (Array.isArray(value)) {
-      return value.length > 0 ? value.join(", ") : "Geen items"
-    }
-    return JSON.stringify(value)
-  }
   return String(value)
 }
 
@@ -135,20 +136,10 @@ const safeArray = (value: any): any[] => {
   return []
 }
 
-// Safe destination name extraction
-const getDestinationName = (destination: any): string => {
-  if (typeof destination === "string") return destination
-  if (typeof destination === "object" && destination !== null) {
-    return destination.name || destination.code || destination.country || "Onbekende bestemming"
-  }
-  return safeString(destination)
-}
-
 // Image Slideshow Component
 function ImageSlideshow({ images, alt }: { images: string[]; alt: string }) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  // Safe array handling
   const safeImages = safeArray(images).filter((img) => typeof img === "string" && img.length > 0)
 
   if (safeImages.length === 0) {
@@ -220,7 +211,6 @@ export default function PackageWerkbladPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load holiday package from localStorage
     const savedPackage = localStorage.getItem("importedHolidayPackage")
     console.log("🔍 Raw localStorage holiday package data:", savedPackage)
 
@@ -230,159 +220,84 @@ export default function PackageWerkbladPage() {
         console.log("📋 Parsed holiday package data:", packageData)
 
         if (packageData && typeof packageData === "object") {
-          // Safely process the package data
-          const safePackageData: HolidayPackage = {
+          // Process the package data with proper fallbacks
+          const processedPackage: HolidayPackage = {
             id: safeString(packageData.id) || "UNKNOWN",
-            name: safeString(packageData.name) || "Untitled Holiday Package",
-            description: safeString(packageData.description) || "",
+            name: safeString(packageData.name) || "Holiday Package",
+            description: safeString(packageData.description) || "Geen beschrijving beschikbaar",
             shortDescription: safeString(packageData.shortDescription),
             imageUrl: safeString(packageData.imageUrl),
-            duration: typeof packageData.duration === "number" ? packageData.duration : 0,
+            duration: typeof packageData.duration === "number" && packageData.duration > 0 ? packageData.duration : 7,
             destinations: safeArray(packageData.destinations)
-              .map((d) => {
-                // Handle destination objects vs strings
-                if (typeof d === "string") return d
-                if (typeof d === "object" && d !== null) {
-                  // Extract readable name from destination object
-                  return d.name || d.code || d.description || JSON.stringify(d)
-                }
-                return safeString(d)
-              })
-              .filter(Boolean),
-            themes: safeArray(packageData.themes)
-              .map((t) => safeString(t))
-              .filter(Boolean),
-            priceFrom:
-              packageData.priceFrom && typeof packageData.priceFrom === "object"
-                ? {
-                    amount: typeof packageData.priceFrom.amount === "number" ? packageData.priceFrom.amount : 0,
-                    currency: safeString(packageData.priceFrom.currency) || "EUR",
-                  }
-                : { amount: 0, currency: "EUR" },
-            pricePerPerson:
-              packageData.pricePerPerson && typeof packageData.pricePerPerson === "object"
-                ? {
-                    amount:
-                      typeof packageData.pricePerPerson.amount === "number" ? packageData.pricePerPerson.amount : 0,
-                    currency: safeString(packageData.pricePerPerson.currency) || "EUR",
-                  }
-                : { amount: 0, currency: "EUR" },
-            totalPrice:
-              packageData.totalPrice && typeof packageData.totalPrice === "object"
-                ? {
-                    amount: typeof packageData.totalPrice.amount === "number" ? packageData.totalPrice.amount : 0,
-                    currency: safeString(packageData.totalPrice.currency) || "EUR",
-                  }
-                : { amount: 0, currency: "EUR" },
+              .map((dest: any) => ({
+                name: safeString(dest?.name || dest?.code || dest),
+                code: safeString(dest?.code),
+                country: safeString(dest?.country),
+                description: safeString(dest?.description),
+              }))
+              .filter((dest) => dest.name),
+            themes: safeArray(packageData.themes).map(safeString).filter(Boolean),
+            priceFrom: packageData.priceFrom || { amount: 0, currency: "EUR" },
+            pricePerPerson: packageData.pricePerPerson || { amount: 0, currency: "EUR" },
+            totalPrice: packageData.totalPrice || { amount: 0, currency: "EUR" },
             departureDate: safeString(packageData.departureDate),
             returnDate: safeString(packageData.returnDate),
-            availability:
-              packageData.availability && typeof packageData.availability === "object"
-                ? {
-                    available: Boolean(packageData.availability.available),
-                    spotsLeft:
-                      typeof packageData.availability.spotsLeft === "number" ? packageData.availability.spotsLeft : 0,
-                    totalSpots:
-                      typeof packageData.availability.totalSpots === "number" ? packageData.availability.totalSpots : 0,
-                  }
-                : { available: true, spotsLeft: 0, totalSpots: 0 },
-            inclusions: safeArray(packageData.inclusions)
-              .map((i) => safeString(i))
-              .filter(Boolean),
-            exclusions: safeArray(packageData.exclusions)
-              .map((e) => safeString(e))
-              .filter(Boolean),
+            availability: packageData.availability || { available: true, spotsLeft: 0, totalSpots: 0 },
+            inclusions: safeArray(packageData.inclusions).map(safeString).filter(Boolean),
+            exclusions: safeArray(packageData.exclusions).map(safeString).filter(Boolean),
             itinerary: safeArray(packageData.itinerary).map((day: any) => ({
               day: typeof day.day === "number" ? day.day : 0,
-              title: safeString(day.title) || "",
+              title: safeString(day.title) || `Dag ${day.day || 1}`,
               description: safeString(day.description) || "",
-              activities: safeArray(day.activities)
-                .map((a) => safeString(a))
-                .filter(Boolean),
+              activities: safeArray(day.activities).map(safeString).filter(Boolean),
               accommodation: safeString(day.accommodation),
-              meals: safeArray(day.meals)
-                .map((m) => safeString(m))
-                .filter(Boolean),
+              meals: safeArray(day.meals).map(safeString).filter(Boolean),
             })),
             accommodations: safeArray(packageData.accommodations).map((acc: any) => ({
-              name: safeString(acc.name) || "",
-              type: safeString(acc.type) || "",
-              category: typeof acc.category === "number" ? acc.category : 0,
-              location: safeString(acc.location) || "",
+              name: safeString(acc.name) || "Accommodatie",
+              type: safeString(acc.type) || "Hotel",
+              category: typeof acc.category === "number" ? acc.category : 3,
+              location: safeString(acc.location) || "Onbekende locatie",
               description: safeString(acc.description),
-              amenities: safeArray(acc.amenities)
-                .map((a) => safeString(a))
-                .filter(Boolean),
-              images: safeArray(acc.images)
-                .map((i) => safeString(i))
-                .filter(Boolean),
+              amenities: safeArray(acc.amenities).map(safeString).filter(Boolean),
+              images: safeArray(acc.images).map(safeString).filter(Boolean),
             })),
             transports: safeArray(packageData.transports).map((transport: any) => ({
-              type: safeString(transport.type) || "",
-              from: safeString(transport.from) || "",
-              to: safeString(transport.to) || "",
+              type: safeString(transport.type) || "Transport",
+              from: safeString(transport.from) || "Vertrekpunt",
+              to: safeString(transport.to) || "Bestemming",
               date: safeString(transport.date),
               time: safeString(transport.time),
               duration: safeString(transport.duration),
               company: safeString(transport.company),
             })),
             activities: safeArray(packageData.activities).map((activity: any) => ({
-              name: safeString(activity.name) || "",
-              type: safeString(activity.type) || "",
+              name: safeString(activity.name) || "Activiteit",
+              type: safeString(activity.type) || "Excursie",
               description: safeString(activity.description),
               duration: safeString(activity.duration),
               included: Boolean(activity.included),
-              price:
-                activity.price && typeof activity.price === "object"
-                  ? {
-                      amount: typeof activity.price.amount === "number" ? activity.price.amount : 0,
-                      currency: safeString(activity.price.currency) || "EUR",
-                    }
-                  : undefined,
+              price: activity.price || undefined,
             })),
-            bookingConditions:
-              packageData.bookingConditions && typeof packageData.bookingConditions === "object"
-                ? {
-                    cancellationPolicy: safeString(packageData.bookingConditions.cancellationPolicy),
-                    paymentTerms: safeString(packageData.bookingConditions.paymentTerms),
-                    minimumAge:
-                      typeof packageData.bookingConditions.minimumAge === "number"
-                        ? packageData.bookingConditions.minimumAge
-                        : 0,
-                    maximumGroupSize:
-                      typeof packageData.bookingConditions.maximumGroupSize === "number"
-                        ? packageData.bookingConditions.maximumGroupSize
-                        : 50,
-                    requiredDocuments: safeArray(packageData.bookingConditions.requiredDocuments)
-                      .map((d) => safeString(d))
-                      .filter(Boolean),
-                  }
-                : {
-                    cancellationPolicy: "Standard cancellation policy",
-                    paymentTerms: "Payment required at booking",
-                    minimumAge: 0,
-                    maximumGroupSize: 50,
-                    requiredDocuments: ["Valid passport"],
-                  },
-            contact:
-              packageData.contact && typeof packageData.contact === "object"
-                ? {
-                    tourOperator: safeString(packageData.contact.tourOperator),
-                    phone: safeString(packageData.contact.phone),
-                    email: safeString(packageData.contact.email),
-                    website: safeString(packageData.contact.website),
-                  }
-                : {
-                    tourOperator: "Travel Compositor",
-                    phone: "",
-                    email: "",
-                    website: "",
-                  },
-            searchMethod: safeString(packageData.searchMethod) || "Unknown",
+            bookingConditions: packageData.bookingConditions || {
+              cancellationPolicy: "Standaard annuleringsbeleid",
+              paymentTerms: "Betaling vereist bij boeking",
+              minimumAge: 0,
+              maximumGroupSize: 50,
+              requiredDocuments: ["Geldig paspoort"],
+            },
+            contact: packageData.contact || {
+              tourOperator: "Travel Compositor",
+              phone: "",
+              email: "",
+              website: "",
+            },
+            searchMethod: safeString(packageData.searchMethod) || "Holiday Package Import",
             micrositeId: safeString(packageData.micrositeId) || "Unknown",
+            rawData: packageData.rawData,
           }
 
-          setHolidayPackage(safePackageData)
+          setHolidayPackage(processedPackage)
         } else {
           setError("Ongeldige holiday package data structuur")
         }
@@ -391,7 +306,6 @@ export default function PackageWerkbladPage() {
         setError("Fout bij het laden van holiday package data")
       }
     } else {
-      console.log("❌ No holiday package data found in localStorage")
       setError("Geen holiday package data gevonden")
     }
     setLoading(false)
@@ -561,12 +475,10 @@ export default function PackageWerkbladPage() {
             )}
 
             {/* Description */}
-            {holidayPackage.description && (
-              <div className="mb-6">
-                <h3 className="font-semibold text-gray-700 mb-2">Beschrijving</h3>
-                <p className="text-gray-600">{holidayPackage.description}</p>
-              </div>
-            )}
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-700 mb-2">Beschrijving</h3>
+              <p className="text-gray-600">{holidayPackage.description}</p>
+            </div>
 
             {/* Themes */}
             {holidayPackage.themes && holidayPackage.themes.length > 0 && (
@@ -583,41 +495,33 @@ export default function PackageWerkbladPage() {
             )}
 
             {/* Destinations */}
-            {holidayPackage.destinations.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-semibold text-gray-700 mb-2">Bestemmingen</h3>
-                <div className="flex flex-wrap gap-2">
-                  {holidayPackage.destinations.map((destination, index) => (
-                    <Badge key={index} className="bg-orange-100 text-orange-700">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {getDestinationName(destination)}
-                    </Badge>
-                  ))}
-                </div>
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-700 mb-2">Bestemmingen</h3>
+              <div className="flex flex-wrap gap-2">
+                {holidayPackage.destinations.map((destination, index) => (
+                  <Badge key={index} className="bg-orange-100 text-orange-700">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    {destination.name}
+                  </Badge>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Statistics */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <Hotel className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-blue-600">
-                  {holidayPackage.accommodations ? holidayPackage.accommodations.length : 0}
-                </div>
+                <div className="text-2xl font-bold text-blue-600">{holidayPackage.accommodations?.length || 0}</div>
                 <div className="text-sm text-gray-600">Accommodaties</div>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <Plane className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-green-600">
-                  {holidayPackage.transports ? holidayPackage.transports.length : 0}
-                </div>
+                <div className="text-2xl font-bold text-green-600">{holidayPackage.transports?.length || 0}</div>
                 <div className="text-sm text-gray-600">Transport</div>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <Camera className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-purple-600">
-                  {holidayPackage.activities ? holidayPackage.activities.length : 0}
-                </div>
+                <div className="text-2xl font-bold text-purple-600">{holidayPackage.activities?.length || 0}</div>
                 <div className="text-sm text-gray-600">Activiteiten</div>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
@@ -639,23 +543,17 @@ export default function PackageWerkbladPage() {
             <TabsTrigger value="accommodations" className="flex flex-col items-center space-y-1 p-3">
               <Hotel className="h-4 w-4" />
               <span className="text-xs">Accommodaties</span>
-              <span className="text-xs text-gray-500">
-                ({holidayPackage.accommodations ? holidayPackage.accommodations.length : 0})
-              </span>
+              <span className="text-xs text-gray-500">({holidayPackage.accommodations?.length || 0})</span>
             </TabsTrigger>
             <TabsTrigger value="transport" className="flex flex-col items-center space-y-1 p-3">
               <Plane className="h-4 w-4" />
               <span className="text-xs">Transport</span>
-              <span className="text-xs text-gray-500">
-                ({holidayPackage.transports ? holidayPackage.transports.length : 0})
-              </span>
+              <span className="text-xs text-gray-500">({holidayPackage.transports?.length || 0})</span>
             </TabsTrigger>
             <TabsTrigger value="activities" className="flex flex-col items-center space-y-1 p-3">
               <Camera className="h-4 w-4" />
               <span className="text-xs">Activiteiten</span>
-              <span className="text-xs text-gray-500">
-                ({holidayPackage.activities ? holidayPackage.activities.length : 0})
-              </span>
+              <span className="text-xs text-gray-500">({holidayPackage.activities?.length || 0})</span>
             </TabsTrigger>
             <TabsTrigger value="inclusions" className="flex flex-col items-center space-y-1 p-3">
               <CheckCircle className="h-4 w-4" />
@@ -675,7 +573,7 @@ export default function PackageWerkbladPage() {
                   <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white">
                     <CardTitle className="flex items-center">
                       <Calendar className="h-5 w-5 mr-2" />
-                      Dag {day.day}: {day.title}
+                      {day.title}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6">
@@ -1046,6 +944,18 @@ export default function PackageWerkbladPage() {
                         )}
                     </div>
                   </div>
+
+                  {/* Debug Information */}
+                  {holidayPackage.rawData && (
+                    <details className="mt-6">
+                      <summary className="cursor-pointer text-sm font-medium text-gray-700">
+                        Debug: Raw API Data
+                      </summary>
+                      <pre className="mt-2 p-3 bg-gray-100 rounded text-xs overflow-auto max-h-40">
+                        {JSON.stringify(holidayPackage.rawData, null, 2)}
+                      </pre>
+                    </details>
+                  )}
                 </CardContent>
               </Card>
             </div>

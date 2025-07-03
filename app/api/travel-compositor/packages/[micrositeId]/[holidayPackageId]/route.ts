@@ -82,21 +82,64 @@ export async function GET(
 
     const packageData = await packageResponse.json()
 
+    // Transform the API response to our internal format
+    const transformedPackage = {
+      id: holidayPackageId,
+      name: packageData.name || packageData.title || "Holiday Package",
+      description: packageData.description || packageData.longDescription || "",
+      shortDescription: packageData.shortDescription || packageData.summary || "",
+      imageUrl: packageData.imageUrl || packageData.mainImage || (packageData.images && packageData.images[0]) || "",
+      duration: packageData.duration || packageData.numberOfDays || packageData.days || 7,
+      destinations: packageData.destinations
+        ? packageData.destinations.map((dest: any) => ({
+            name: dest.name || dest.code || dest.description,
+            code: dest.code,
+            country: dest.country,
+            description: dest.description,
+          }))
+        : [],
+      themes: packageData.themes || packageData.categories || [],
+      priceFrom: packageData.priceFrom || packageData.price || { amount: 0, currency: "EUR" },
+      pricePerPerson: packageData.pricePerPerson || packageData.pricePerAdult || { amount: 0, currency: "EUR" },
+      totalPrice: packageData.totalPrice || packageData.price || { amount: 0, currency: "EUR" },
+      departureDate: packageData.departureDate || packageData.startDate,
+      returnDate: packageData.returnDate || packageData.endDate,
+      availability: {
+        available: packageData.available !== false,
+        spotsLeft: packageData.spotsLeft || packageData.availableSpots || 0,
+        totalSpots: packageData.totalSpots || packageData.maxParticipants || 0,
+      },
+      inclusions: packageData.inclusions || packageData.included || [],
+      exclusions: packageData.exclusions || packageData.notIncluded || [],
+      itinerary: packageData.itinerary || packageData.schedule || packageData.program || [],
+      accommodations: packageData.accommodations || packageData.hotels || [],
+      transports: packageData.transports || packageData.transportation || [],
+      activities: packageData.activities || packageData.excursions || [],
+      bookingConditions: packageData.bookingConditions || {
+        cancellationPolicy: "Standard cancellation policy",
+        paymentTerms: "Payment required at booking",
+        minimumAge: 0,
+        maximumGroupSize: 50,
+        requiredDocuments: ["Valid passport"],
+      },
+      contact: packageData.contact || {
+        tourOperator: "Travel Compositor",
+        phone: "",
+        email: "",
+        website: "",
+      },
+      searchMethod: "Holiday Package API",
+      micrositeId: actualMicrositeId,
+    }
+
     return NextResponse.json({
       success: true,
-      package: packageData,
+      package: transformedPackage,
+      rawData: packageData, // Include raw data for debugging
       micrositeId: actualMicrositeId,
       holidayPackageId,
       endpoint: `https://online.travelcompositor.com/resources/package/${actualMicrositeId}/${holidayPackageId}`,
       method: "GET",
-      headers: {
-        "auth-token": "REQUIRED",
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      queryParams: {
-        lang: lang,
-      },
     })
   } catch (error) {
     console.error("❌ Error fetching holiday package:", error)
