@@ -6,19 +6,18 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Search, Eye, Calendar, CheckCircle, XCircle } from "lucide-react"
+import { Search, AlertCircle, CheckCircle, Calendar } from "lucide-react"
 
 export default function BookingEndpointDiscoverer() {
   const [discoveryResults, setDiscoveryResults] = useState<any>(null)
-  const [specificBookingId, setSpecificBookingId] = useState("")
-  const [specificBooking, setSpecificBooking] = useState<any>(null)
+  const [searchBookingId, setSearchBookingId] = useState("")
+  const [foundBooking, setFoundBooking] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState("")
 
-  const handleDiscovery = async () => {
+  const discoverEndpoints = async () => {
     setIsLoading(true)
-    setMessage("Discovering booking endpoints...")
-    setDiscoveryResults(null)
+    setMessage("")
 
     try {
       const response = await fetch("/api/discover-booking-endpoints")
@@ -26,9 +25,7 @@ export default function BookingEndpointDiscoverer() {
 
       if (result.success) {
         setDiscoveryResults(result.results)
-        setMessage(
-          `✅ Discovery complete! Found ${result.summary.workingEndpoints} working endpoints with ${result.summary.sampleBookings} sample bookings`,
-        )
+        setMessage(`✅ Discovery complete: ${result.summary.workingEndpoints} working endpoints found`)
       } else {
         setMessage(`❌ Discovery failed: ${result.error}`)
       }
@@ -39,30 +36,30 @@ export default function BookingEndpointDiscoverer() {
     }
   }
 
-  const handleSpecificBookingSearch = async () => {
-    if (!specificBookingId.trim()) return
+  const searchSpecificBooking = async () => {
+    if (!searchBookingId.trim()) return
 
     setIsLoading(true)
-    setMessage(`Searching for booking ${specificBookingId}...`)
-    setSpecificBooking(null)
+    setMessage("")
+    setFoundBooking(null)
 
     try {
       const response = await fetch("/api/discover-booking-endpoints", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: specificBookingId.trim() }),
+        body: JSON.stringify({ bookingId: searchBookingId.trim() }),
       })
 
       const result = await response.json()
 
       if (result.success) {
-        setSpecificBooking(result.booking)
-        setMessage(`✅ Found booking ${specificBookingId}!`)
+        setFoundBooking(result.booking)
+        setMessage(`✅ Found booking ${searchBookingId}!`)
       } else {
-        setMessage(`❌ Booking ${specificBookingId} not found: ${result.error}`)
+        setMessage(`❌ Booking not found: ${result.error}`)
       }
     } catch (error) {
-      setMessage("❌ Booking search failed")
+      setMessage("❌ Search failed")
     } finally {
       setIsLoading(false)
     }
@@ -74,77 +71,80 @@ export default function BookingEndpointDiscoverer() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5" />
+            <Search className="h-5 w-5" />
             Booking Endpoint Discovery
           </CardTitle>
-          <CardDescription>
-            Discover which booking endpoints work and find sample bookings to understand the data structure
-          </CardDescription>
+          <CardDescription>Discover which booking endpoints work and find sample bookings</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-4">
-            <Button onClick={handleDiscovery} disabled={isLoading} className="flex-1">
-              {isLoading ? "Discovering..." : "Discover Booking Endpoints"}
-            </Button>
-          </div>
-
-          <div className="border-t pt-4">
-            <label className="text-sm font-medium">Search for Specific Booking</label>
-            <div className="flex gap-2 mt-2">
-              <Input
-                placeholder="Enter booking ID or reference"
-                value={specificBookingId}
-                onChange={(e) => setSpecificBookingId(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSpecificBookingSearch()}
-              />
-              <Button
-                onClick={handleSpecificBookingSearch}
-                disabled={isLoading || !specificBookingId.trim()}
-                variant="outline"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <Button onClick={discoverEndpoints} disabled={isLoading} size="lg" className="w-full">
+            {isLoading ? "Discovering..." : "Discover Booking Endpoints"}
+          </Button>
 
           {message && (
             <div
-              className={`p-3 rounded-lg ${
-                message.includes("✅")
-                  ? "bg-green-50 text-green-800"
-                  : message.includes("❌")
-                    ? "bg-red-50 text-red-800"
-                    : "bg-blue-50 text-blue-800"
+              className={`p-3 rounded-lg flex items-center gap-2 ${
+                message.includes("✅") ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
               }`}
             >
+              {message.includes("✅") ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
               {message}
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Search Specific Booking */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Search Specific Booking
+          </CardTitle>
+          <CardDescription>Search for a specific booking ID in all discovered endpoints</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter booking ID (e.g. RRP-9569)"
+              value={searchBookingId}
+              onChange={(e) => setSearchBookingId(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && searchSpecificBooking()}
+            />
+            <Button onClick={searchSpecificBooking} disabled={isLoading || !searchBookingId.trim()}>
+              Search
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Discovery Results */}
       {discoveryResults && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <>
           {/* Working Endpoints */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                Working Endpoints ({discoveryResults.workingEndpoints.length})
-              </CardTitle>
+              <CardTitle>Working Endpoints ({discoveryResults.workingEndpoints.length})</CardTitle>
+              <CardDescription>Endpoints that returned data successfully</CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-64">
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {discoveryResults.workingEndpoints.map((endpoint: any, index: number) => (
-                    <div key={index} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <code className="text-sm bg-gray-100 px-2 py-1 rounded">{endpoint.endpoint}</code>
-                        <Badge variant="outline">{endpoint.status}</Badge>
+                    <div key={index} className="border rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-mono text-sm">{endpoint.endpoint}</p>
+                          {endpoint.agencyName && (
+                            <p className="text-xs text-gray-600">Agency: {endpoint.agencyName}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{endpoint.status}</Badge>
+                          {endpoint.totalCount && <Badge variant="secondary">{endpoint.totalCount} items</Badge>}
+                        </div>
                       </div>
-                      {endpoint.agencyName && <p className="text-sm text-gray-600">Agency: {endpoint.agencyName}</p>}
-                      <p className="text-xs text-gray-500">Data keys: {endpoint.dataKeys.join(", ")}</p>
+                      <div className="mt-2 text-xs text-gray-500">Data keys: {endpoint.dataKeys.join(", ")}</div>
                     </div>
                   ))}
                 </div>
@@ -153,76 +153,83 @@ export default function BookingEndpointDiscoverer() {
           </Card>
 
           {/* Sample Bookings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-600" />
-                Sample Bookings ({discoveryResults.sampleBookings.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-64">
-                <div className="space-y-3">
-                  {discoveryResults.sampleBookings.map((booking: any, index: number) => (
-                    <div key={index} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">
-                          {booking.id || booking.reference || booking.bookingReference || `Booking ${index + 1}`}
-                        </span>
-                        <Button size="sm" variant="outline" onClick={() => setSpecificBooking(booking)}>
-                          View
-                        </Button>
+          {discoveryResults.sampleBookings.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Sample Bookings ({discoveryResults.sampleBookings.length})</CardTitle>
+                <CardDescription>Sample bookings found in the endpoints</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-64">
+                  <div className="space-y-2">
+                    {discoveryResults.sampleBookings.slice(0, 20).map((booking: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">
+                              {booking.id || booking.reference || booking.bookingReference || `Booking ${index + 1}`}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {booking.creationDate || booking.bookingDate || booking.created || "No date"}
+                            </p>
+                          </div>
+                          <Button size="sm" onClick={() => setSearchBookingId(booking.id || booking.reference || "")}>
+                            Test This ID
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600">
-                        {booking.customerName || booking.clientName || "No customer name"}
-                      </p>
-                      <p className="text-xs text-gray-500">Keys: {Object.keys(booking).slice(0, 5).join(", ")}...</p>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Failed Endpoints */}
-      {discoveryResults && discoveryResults.failedEndpoints.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-red-600" />
-              Failed Endpoints ({discoveryResults.failedEndpoints.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-32">
-              <div className="space-y-2">
-                {discoveryResults.failedEndpoints.map((endpoint: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-2 border rounded">
-                    <code className="text-sm">{endpoint.endpoint}</code>
-                    <Badge variant="destructive">{endpoint.status || "Error"}</Badge>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent 2025 Bookings */}
+          {discoveryResults.year2025Bookings && discoveryResults.year2025Bookings.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>2025 Bookings ({discoveryResults.year2025Bookings.length})</CardTitle>
+                <CardDescription>Bookings from 2025 specifically</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-64">
+                  <div className="space-y-2">
+                    {discoveryResults.year2025Bookings.slice(0, 10).map((booking: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">
+                              {booking.id || booking.reference || booking.bookingReference || `Booking ${index + 1}`}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {booking.creationDate || booking.bookingDate || booking.created || "No date"}
+                            </p>
+                          </div>
+                          <Button size="sm" onClick={() => setSearchBookingId(booking.id || booking.reference || "")}>
+                            Test This ID
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
-      {/* Specific Booking Details */}
-      {specificBooking && (
+      {/* Found Booking */}
+      {foundBooking && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Booking Details
-            </CardTitle>
+            <CardTitle>Found Booking: {searchBookingId}</CardTitle>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-96">
               <pre className="text-sm bg-gray-50 p-4 rounded-lg overflow-auto">
-                {JSON.stringify(specificBooking, null, 2)}
+                {JSON.stringify(foundBooking, null, 2)}
               </pre>
             </ScrollArea>
           </CardContent>
