@@ -7,8 +7,8 @@ export default function Loading() {
           <p className="text-xl text-gray-600">Loading import dashboard...</p>
         </div>
 
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       </div>
     </div>
