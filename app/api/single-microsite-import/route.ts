@@ -3,7 +3,7 @@ import { SingleMicrositeImporter } from "@/lib/single-microsite-importer"
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("🚀 Starting single microsite import...")
+    console.log("🚀 Starting complete single microsite import...")
 
     const importer = new SingleMicrositeImporter()
 
@@ -26,24 +26,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Importeer alleen agencies eerst
-    const importResult = await importer.importAgenciesOnly()
+    // Complete import met users, bookings en ideas
+    const importResult = await importer.importComplete()
 
     return NextResponse.json({
       success: true,
-      message: `Successfully imported ${importResult.totalAgencies} agencies from microsite 1`,
+      message: `Successfully imported complete data from microsite 1: ${importResult.totalAgencies} agencies, ${importResult.totalUsers} users, ${importResult.totalBookings} bookings, ${importResult.totalIdeas} ideas`,
       data: {
         totalAgencies: importResult.totalAgencies,
-        totalUsers: 0, // Nog niet geïmplementeerd
-        totalBookings: 0, // Nog niet geïmplementeerd
-        totalIdeas: 0, // Nog niet geïmplementeerd
+        totalUsers: importResult.totalUsers,
+        totalBookings: importResult.totalBookings,
+        totalIdeas: importResult.totalIdeas,
         agencies: importResult.agencies.map((agency) => ({
           id: agency.id,
           name: agency.name,
           micrositeId: agency.micrositeId,
-          usersCount: 0,
+          usersCount: agency.users.length,
           creditBalance: agency.creditBalance,
-          users: [],
+          users: agency.users.map((user) => ({
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            bookingsCount: user.bookings.length,
+            ideasCount: user.ideas.length,
+            bookings: user.bookings.slice(0, 5), // Limiteer voor UI
+            ideas: user.ideas.slice(0, 5), // Limiteer voor UI
+          })),
         })),
       },
     })
