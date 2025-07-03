@@ -140,43 +140,67 @@ export class UniversalTravelImporter {
   private async importBooking(bookingId: string, config: any, token: string): Promise<ImportResult> {
     console.log(`📋 Importing booking ${bookingId} from ${config.name}`)
 
-    // Only try direct booking endpoints - NO search fallbacks
-    const endpoints = [
-      `${this.baseUrl}/resources/booking/${config.micrositeId}/${bookingId}`,
-      `${this.baseUrl}/resources/booking/getBooking?microsite=${config.micrositeId}&bookingId=${bookingId}`,
-    ]
+    // Clean the booking ID - remove RRP- prefix if present
+    const cleanBookingId = bookingId.replace(/^RRP-?/i, "")
 
-    for (const endpoint of endpoints) {
-      try {
-        const response = await fetch(endpoint, {
-          headers: {
-            "auth-token": token,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        })
+    // Try both original and cleaned ID
+    const idsToTry = [bookingId, cleanBookingId]
 
-        if (response.ok) {
-          const data = await response.json()
+    for (const idToTry of idsToTry) {
+      console.log(`🔍 Trying booking ID: ${idToTry}`)
 
-          // Only return if we actually got booking data
-          if (data && (data.id || data.bookingReference || data.bookingId)) {
-            return {
-              success: true,
-              type: "booking",
-              data: this.transformBookingData(data, bookingId),
-              foundInMicrosite: config.name,
-              searchMethod: `Direct booking lookup via ${endpoint}`,
+      // Try different booking endpoints
+      const endpoints = [
+        `${this.baseUrl}/resources/booking/${config.micrositeId}/${idToTry}`,
+        `${this.baseUrl}/resources/booking/getBooking?microsite=${config.micrositeId}&bookingId=${idToTry}`,
+        `${this.baseUrl}/resources/booking/${idToTry}?microsite=${config.micrositeId}`,
+      ]
+
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`🔗 Trying booking endpoint: ${endpoint}`)
+
+          const response = await fetch(endpoint, {
+            headers: {
+              "auth-token": token,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          })
+
+          console.log(`📡 Booking response status: ${response.status}`)
+
+          if (response.ok) {
+            const data = await response.json()
+            console.log(`📋 Booking data keys:`, Object.keys(data))
+
+            // Only return if we actually got booking data
+            if (data && (data.id || data.bookingReference || data.bookingId || data.bookedTrip)) {
+              return {
+                success: true,
+                type: "booking",
+                data: this.transformBookingData(data, bookingId),
+                foundInMicrosite: config.name,
+                searchMethod: `Direct booking lookup via ${endpoint}`,
+                debugInfo: {
+                  endpoint,
+                  originalId: bookingId,
+                  cleanedId: cleanBookingId,
+                  usedId: idToTry,
+                  responseKeys: Object.keys(data),
+                },
+              }
             }
           }
+        } catch (error) {
+          console.log(`❌ Booking endpoint error: ${endpoint} -`, error)
+          continue
         }
-      } catch (error) {
-        continue
       }
     }
 
     // If no direct lookup works, fail - NO fallbacks
-    throw new Error(`Booking ${bookingId} not found in ${config.name}`)
+    throw new Error(`Booking ${bookingId} (tried: ${idsToTry.join(", ")}) not found in ${config.name}`)
   }
 
   // Travel Idea import
