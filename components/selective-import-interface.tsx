@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Search, Download, Package, Calendar, Lightbulb } from "lucide-react"
+import { Search, Download, Package, Calendar, Lightbulb, AlertCircle, CheckCircle } from "lucide-react"
 
 export default function SelectiveImportInterface() {
   const [selectedType, setSelectedType] = useState<"booking" | "idea" | "package">("booking")
@@ -16,12 +16,14 @@ export default function SelectiveImportInterface() {
   const [importedData, setImportedData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState("")
+  const [importLog, setImportLog] = useState<string[]>([])
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) return
 
     setIsLoading(true)
     setMessage("")
+    setImportLog([])
 
     try {
       const response = await fetch("/api/selective-import", {
@@ -57,6 +59,8 @@ export default function SelectiveImportInterface() {
 
     setIsLoading(true)
     setMessage("")
+    setImportLog([])
+    setImportedData(null)
 
     try {
       const response = await fetch("/api/selective-import", {
@@ -74,9 +78,35 @@ export default function SelectiveImportInterface() {
       if (result.success) {
         setImportedData(result.data)
         setMessage(`✅ Successfully imported ${selectedType} ${targetId}`)
+
+        // Toon wat key info over de geïmporteerde data
+        if (selectedType === "booking" && result.data) {
+          const booking = result.data
+          const destinations = booking.destinations || []
+          const hotels = booking.hotels || []
+          const transports = booking.transports || []
+
+          setImportLog([
+            `📋 Booking ID: ${targetId}`,
+            `🌍 Destinations: ${destinations.map((d: any) => d.name).join(", ")}`,
+            `🏨 Hotels: ${hotels.length} hotel(s)`,
+            `✈️ Transports: ${transports.length} transport(s)`,
+            `💰 Total estimated value: €${booking.totalPrice || "N/A"}`,
+          ])
+        }
       } else {
         setMessage(`❌ Import failed: ${result.error}`)
         setImportedData(null)
+
+        if (selectedType === "booking") {
+          setImportLog([
+            "🔍 Booking import failed - this could be because:",
+            "• The booking ID doesn't exist",
+            "• The booking is under a different user/agency",
+            "• The booking is in a different microsite",
+            "• The booking reference format is different",
+          ])
+        }
       }
     } catch (error) {
       setMessage("❌ Import failed")
@@ -176,9 +206,34 @@ export default function SelectiveImportInterface() {
 
           {message && (
             <div
-              className={`p-3 rounded-lg ${message.includes("✅") ? "bg-green-50 text-green-800" : message.includes("❌") ? "bg-red-50 text-red-800" : "bg-blue-50 text-blue-800"}`}
+              className={`p-3 rounded-lg flex items-center gap-2 ${
+                message.includes("✅")
+                  ? "bg-green-50 text-green-800"
+                  : message.includes("❌")
+                    ? "bg-red-50 text-red-800"
+                    : "bg-blue-50 text-blue-800"
+              }`}
             >
+              {message.includes("✅") ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : message.includes("❌") ? (
+                <AlertCircle className="h-4 w-4" />
+              ) : null}
               {message}
+            </div>
+          )}
+
+          {/* Import Log */}
+          {importLog.length > 0 && (
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <h4 className="font-medium mb-2">Import Details:</h4>
+              <ul className="text-sm space-y-1">
+                {importLog.map((log, index) => (
+                  <li key={index} className="text-gray-700">
+                    {log}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </CardContent>

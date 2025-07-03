@@ -31,22 +31,75 @@ export class SelectiveTravelImporter {
     return this.authToken
   }
 
-  // Import specifieke booking
+  // Haal alle agencies op om users te vinden
+  async getAllAgencies(): Promise<any[]> {
+    const token = await this.authenticate()
+    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID!
+
+    try {
+      const response = await fetch(`${this.baseUrl}/resources/agency/${micrositeId}?first=0&limit=100`, {
+        headers: {
+          "auth-token": token,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        return data.agency || data.agencies || []
+      }
+    } catch (error) {
+      console.log("⚠️ Error fetching agencies:", error)
+    }
+
+    return []
+  }
+
+  // Haal users op voor een agency
+  async getUsersForAgency(agencyId: string): Promise<any[]> {
+    const token = await this.authenticate()
+    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID!
+
+    try {
+      const response = await fetch(`${this.baseUrl}/resources/user/${micrositeId}/${agencyId}?first=0&limit=100`, {
+        headers: {
+          "auth-token": token,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        return data.user || data.users || []
+      }
+    } catch (error) {
+      console.log(`⚠️ Error fetching users for agency ${agencyId}:`, error)
+    }
+
+    return []
+  }
+
+  // Import specifieke booking - nu met user-based zoeken
   async importSpecificBooking(bookingId: string): Promise<any> {
     console.log(`📋 Importing specific booking: ${bookingId}`)
 
     const token = await this.authenticate()
     const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID!
 
-    // Probeer verschillende booking endpoints
-    const endpoints = [
+    // Eerst proberen directe booking endpoints
+    const directEndpoints = [
       `/resources/booking/${micrositeId}/${bookingId}`,
       `/resources/booking/${bookingId}`,
       `/resources/booking/${micrositeId}?bookingReference=${bookingId}`,
+      `/resources/booking/${micrositeId}?reference=${bookingId}`,
+      `/resources/booking/${micrositeId}?id=${bookingId}`,
     ]
 
-    for (const endpoint of endpoints) {
+    for (const endpoint of directEndpoints) {
       try {
+        console.log(`🔍 Trying direct endpoint: ${endpoint}`)
         const response = await fetch(`${this.baseUrl}${endpoint}`, {
           headers: {
             "auth-token": token,
@@ -57,15 +110,115 @@ export class SelectiveTravelImporter {
 
         if (response.ok) {
           const data = await response.json()
-          console.log(`✅ Found booking ${bookingId} via ${endpoint}`)
+          console.log(`✅ Found booking ${bookingId} via direct endpoint: ${endpoint}`)
           return data
+        } else {
+          console.log(`❌ Direct endpoint ${endpoint} failed: ${response.status}`)
         }
       } catch (error) {
-        console.log(`⚠️ Endpoint ${endpoint} failed, trying next...`)
+        console.log(`⚠️ Direct endpoint ${endpoint} error:`, error)
       }
     }
 
-    throw new Error(`Booking ${bookingId} not found in any endpoint`)
+    // Als directe endpoints falen, zoek via agencies en users
+    console.log(`🔍 Direct endpoints failed, searching via agencies and users...`)
+
+    const agencies = await this.getAllAgencies()
+    console.log(`🏢 Found ${agencies.length} agencies to search`)
+
+    for (const agency of agencies) {
+      console.log(`🏢 Searching in agency: ${agency.name} (${agency.id})`)
+
+      // Probeer booking endpoints per agency
+      const agencyEndpoints = [
+        `/resources/booking/${micrositeId}/${agency.id}?bookingReference=${bookingId}`,
+        `/resources/booking/${micrositeId}/${agency.id}?reference=${bookingId}`,
+        `/resources/booking/${micrositeId}/${agency.id}?id=${bookingId}`,
+        `/resources/booking/${micrositeId}/${agency.id}`,
+      ]
+
+      for (const endpoint of agencyEndpoints) {
+        try {
+          console.log(`🔍 Trying agency endpoint: ${endpoint}`)
+          const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            headers: {
+              "auth-token": token,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            const bookings = data.booking || data.bookings || []
+
+            // Zoek de specifieke booking
+            const targetBooking = bookings.find(
+              (booking: any) =>
+                booking.id === bookingId ||
+                booking.reference === bookingId ||
+                booking.bookingReference === bookingId ||
+                booking.bookingId === bookingId,
+            )
+
+            if (targetBooking) {
+              console.log(`✅ Found booking ${bookingId} in agency ${agency.name}`)
+              return targetBooking
+            } else if (bookings.length > 0) {
+              console.log(`📋 Found ${bookings.length} bookings in agency ${agency.name}, but not the target booking`)
+            }
+          }
+        } catch (error) {
+          console.log(`⚠️ Agency endpoint ${endpoint} error:`, error)
+        }
+      }
+
+      // Probeer ook via users in deze agency
+      const users = await this.getUsersForAgency(agency.id)
+      console.log(`👥 Found ${users.length} users in agency ${agency.name}`)
+
+      for (const user of users) {
+        const userEndpoints = [
+          `/resources/booking/${micrositeId}/${agency.id}/${user.username}?bookingReference=${bookingId}`,
+          `/resources/booking/${micrositeId}/${agency.id}/${user.username}`,
+        ]
+
+        for (const endpoint of userEndpoints) {
+          try {
+            console.log(`🔍 Trying user endpoint: ${endpoint}`)
+            const response = await fetch(`${this.baseUrl}${endpoint}`, {
+              headers: {
+                "auth-token": token,
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+            })
+
+            if (response.ok) {
+              const data = await response.json()
+              const bookings = data.booking || data.bookings || []
+
+              const targetBooking = bookings.find(
+                (booking: any) =>
+                  booking.id === bookingId ||
+                  booking.reference === bookingId ||
+                  booking.bookingReference === bookingId ||
+                  booking.bookingId === bookingId,
+              )
+
+              if (targetBooking) {
+                console.log(`✅ Found booking ${bookingId} for user ${user.username} in agency ${agency.name}`)
+                return targetBooking
+              }
+            }
+          } catch (error) {
+            console.log(`⚠️ User endpoint ${endpoint} error:`, error)
+          }
+        }
+      }
+    }
+
+    throw new Error(`Booking ${bookingId} not found in any agency or user`)
   }
 
   // Import specifieke travel idea

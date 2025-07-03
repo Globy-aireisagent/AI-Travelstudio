@@ -1,10 +1,31 @@
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <h2 className="text-xl font-semibold text-gray-900">Loading Selective Import...</h2>
-        <p className="text-gray-600">Setting up the import interface...</p>
+    <div className="container mx-auto py-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-8">
+          <div className="h-8 bg-gray-200 rounded animate-pulse mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded animate-pulse w-2/3"></div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="border rounded-lg p-6">
+            <div className="h-6 bg-gray-200 rounded animate-pulse mb-4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+
+          <div className="border rounded-lg p-6">
+            <div className="h-6 bg-gray-200 rounded animate-pulse mb-4"></div>
+            <div className="space-y-2">
+              <div className="h-16 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-16 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-16 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
