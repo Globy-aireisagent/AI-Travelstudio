@@ -6,7 +6,7 @@ export default function DiscoverBookingEndpointsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Booking Endpoint Discovery</h1>
         <p className="text-gray-600 mt-2">
-          Discover which Travel Compositor booking endpoints work and find recent bookings
+          Discover which Travel Compositor booking endpoints work and find recent bookings from 2025
         </p>
       </div>
 
