@@ -7,12 +7,54 @@ export async function POST(request: NextRequest) {
 
     const userManager = new TravelCompositorUserManager()
 
+    // Test eerst authenticatie voor elke microsite
+    const authResults = []
+    for (let micrositeId = 1; micrositeId <= 4; micrositeId++) {
+      try {
+        const token = await userManager.authenticate(micrositeId.toString())
+        authResults.push({ micrositeId, success: true, token: token.substring(0, 10) + "..." })
+        console.log(`✅ Authentication successful for microsite ${micrositeId}`)
+      } catch (error) {
+        authResults.push({ micrositeId, success: false, error: error.message })
+        console.log(`❌ Authentication failed for microsite ${micrositeId}:`, error.message)
+      }
+    }
+
     // Importeer alle data
     const importResult = await userManager.importAllData()
+
+    console.log("📊 Import results:", {
+      agencies: importResult.agencies.length,
+      totalUsers: importResult.totalUsers,
+      totalBookings: importResult.totalBookings,
+      totalIdeas: importResult.totalIdeas,
+    })
+
+    // Als we geen data hebben, geef debug info terug
+    if (importResult.agencies.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "No data imported - check authentication and API endpoints",
+          debug: {
+            authResults,
+            importResult,
+            micrositeConfigs: {
+              microsite1: !!process.env.TRAVEL_COMPOSITOR_USERNAME,
+              microsite2: !!process.env.TRAVEL_COMPOSITOR_USERNAME_2,
+              microsite3: !!process.env.TRAVEL_COMPOSITOR_USERNAME_3,
+              microsite4: !!process.env.TRAVEL_COMPOSITOR_USERNAME_4,
+            },
+          },
+        },
+        { status: 400 },
+      )
+    }
 
     return NextResponse.json({
       success: true,
       message: "Travel Compositor import completed successfully",
+      debug: { authResults },
       data: {
         totalAgencies: importResult.agencies.length,
         totalUsers: importResult.totalUsers,
@@ -45,6 +87,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error occurred",
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 },
     )

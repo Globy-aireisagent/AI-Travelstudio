@@ -77,14 +77,21 @@ export default function TravelCompositorImportDashboard() {
       clearInterval(progressInterval)
       setProgress(100)
 
-      if (response.ok) {
-        const result = await response.json()
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         setImportData(result.data)
         setImportStatus("success")
         console.log("✅ Import successful:", result)
       } else {
         setImportStatus("error")
-        console.error("❌ Import failed")
+        console.error("❌ Import failed:", result)
+
+        // Toon debug info als er geen data is
+        if (result.debug) {
+          console.log("🔍 Debug info:", result.debug)
+          alert(`Import failed: ${result.message}\n\nCheck console for debug info`)
+        }
       }
     } catch (error) {
       clearInterval(progressInterval)
