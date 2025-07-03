@@ -3,7 +3,7 @@ export default function Loading() {
     <div className="container mx-auto py-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">Selective Travel Import</h1>
+          <h1 className="text-3xl font-bold">Booking Endpoint Discovery</h1>
           <p className="text-gray-600 mt-2">Loading...</p>
         </div>
 
