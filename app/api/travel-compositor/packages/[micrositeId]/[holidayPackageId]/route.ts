@@ -5,12 +5,11 @@ export async function GET(
   { params }: { params: { micrositeId: string; holidayPackageId: string } },
 ) {
   try {
-    const { micrositeId, holidayPackageId } = params
     const { searchParams } = new URL(request.url)
     const config = searchParams.get("config") || "1"
-    const lang = searchParams.get("lang") || "nl"
+    const { micrositeId, holidayPackageId } = params
 
-    console.log(`📦 Fetching holiday package ${holidayPackageId} from microsite ${micrositeId}`)
+    console.log(`🏖️ Getting holiday package: ${holidayPackageId} from microsite: ${micrositeId}`)
 
     // Get credentials based on config
     let username, password, actualMicrositeId
@@ -62,38 +61,34 @@ export async function GET(
     const authData = await authResponse.json()
     const token = authData.token
 
-    console.log(`🔑 Authentication successful, trying multiple endpoints for package ${holidayPackageId}`)
+    console.log(`🔑 Authentication successful`)
 
-    let packageData = null
-    let usedEndpoint = ""
-
-    // Try multiple endpoints to find the package data
+    // Try different endpoints to find the package
     const endpoints = [
-      // Try the packages endpoint first
       {
-        url: `https://online.travelcompositor.com/resources/packages/${actualMicrositeId}?lang=${lang}`,
-        name: "packages list",
-      },
-      // Try the package detail endpoint
-      {
-        url: `https://online.travelcompositor.com/resources/package/${actualMicrositeId}/${holidayPackageId}?lang=${lang}`,
+        url: `https://online.travelcompositor.com/resources/package/${actualMicrositeId}/${holidayPackageId}?lang=nl`,
         name: "package detail",
       },
-      // Try the ideas endpoint (travel ideas are often packages)
       {
-        url: `https://online.travelcompositor.com/resources/travelideas/${actualMicrositeId}?lang=${lang}`,
-        name: "travel ideas",
-      },
-      // Try the specific travel idea endpoint
-      {
-        url: `https://online.travelcompositor.com/resources/travelidea/${actualMicrositeId}/${holidayPackageId}?lang=${lang}`,
+        url: `https://online.travelcompositor.com/resources/travelidea/${actualMicrositeId}/${holidayPackageId}?lang=nl`,
         name: "travel idea detail",
+      },
+      {
+        url: `https://online.travelcompositor.com/resources/packages/${actualMicrositeId}?lang=nl`,
+        name: "packages list",
+      },
+      {
+        url: `https://online.travelcompositor.com/resources/travelideas/${actualMicrositeId}?lang=nl`,
+        name: "travel ideas list",
       },
     ]
 
+    let foundPackage: any = null
+    let usedEndpoint = ""
+
     for (const endpoint of endpoints) {
       try {
-        console.log(`🔍 Trying endpoint: ${endpoint.name} - ${endpoint.url}`)
+        console.log(`🔍 Trying ${endpoint.name}: ${endpoint.url}`)
 
         const response = await fetch(endpoint.url, {
           method: "GET",
@@ -106,26 +101,31 @@ export async function GET(
 
         if (response.ok) {
           const data = await response.json()
-          console.log(`✅ Success with ${endpoint.name}:`, JSON.stringify(data, null, 2))
+          console.log(`✅ ${endpoint.name} response received`)
 
-          // If this is a list endpoint, find our specific package
-          if (endpoint.name.includes("list") || endpoint.name.includes("ideas")) {
-            const packages = data.packages || data.travelIdeas || data.holidayPackages || []
-            const foundPackage = packages.find(
-              (pkg: any) =>
-                pkg.id === holidayPackageId || pkg.packageId === holidayPackageId || pkg.ideaId === holidayPackageId,
+          if (endpoint.name.includes("list")) {
+            // Search in array response
+            const items = data.packages || data.travelIdeas || data.holidayPackages || data || []
+            const found = items.find(
+              (item: any) =>
+                item.id === holidayPackageId ||
+                item.packageId === holidayPackageId ||
+                item.ideaId === holidayPackageId ||
+                item.id?.toString() === holidayPackageId,
             )
 
-            if (foundPackage) {
-              packageData = foundPackage
+            if (found) {
+              foundPackage = found
               usedEndpoint = endpoint.name
               break
             }
           } else {
-            // This is a detail endpoint
-            packageData = data
-            usedEndpoint = endpoint.name
-            break
+            // Direct response
+            if (data && (data.id || data.packageId || data.ideaId)) {
+              foundPackage = data
+              usedEndpoint = endpoint.name
+              break
+            }
           }
         } else {
           console.log(`❌ ${endpoint.name} failed: ${response.status}`)
@@ -136,91 +136,67 @@ export async function GET(
       }
     }
 
-    if (!packageData) {
-      // If no package found, try to get destinations and create a basic package structure
-      console.log(`🏙️ No package found, trying to get destinations for microsite ${actualMicrositeId}`)
-
-      try {
-        const destResponse = await fetch(
-          `https://online.travelcompositor.com/resources/destination/${actualMicrositeId}?lang=${lang}`,
-          {
-            headers: {
-              "auth-token": token,
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-          },
-        )
-
-        if (destResponse.ok) {
-          const destData = await destResponse.json()
-          console.log("🏙️ Destinations data:", JSON.stringify(destData, null, 2))
-
-          // Create a basic package from destinations
-          const destinations = destData.destination || []
-          if (destinations.length > 0) {
-            packageData = {
-              id: holidayPackageId,
-              name: `Travel Package ${holidayPackageId}`,
-              destinations: destinations.slice(0, 4), // Take first 4 destinations
-              description: `Travel package with ${destinations.length} destinations`,
-              micrositeId: actualMicrositeId,
-            }
-            usedEndpoint = "destinations fallback"
-          }
-        }
-      } catch (error) {
-        console.log("❌ Destinations fallback failed:", error)
-      }
+    if (!foundPackage) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Holiday Package ${holidayPackageId} not found in microsite ${micrositeId}`,
+        },
+        { status: 404 },
+      )
     }
 
-    if (!packageData) {
-      throw new Error(`Holiday package ${holidayPackageId} not found in any endpoint`)
-    }
-
-    console.log("🔍 Final package data:", JSON.stringify(packageData, null, 2))
-
-    // Transform the data to our expected format
+    // Transform the package data
     const transformedPackage = {
-      id: holidayPackageId,
-      name: packageData.name || packageData.title || `Package ${holidayPackageId}`,
-      description: packageData.description || packageData.shortDescription || "",
-      shortDescription: packageData.shortDescription || "",
-      imageUrl: packageData.imageUrl || packageData.image || "",
-      duration: packageData.duration || packageData.days || 0,
-      destinations: packageData.destinations || [],
-      themes: packageData.themes || packageData.categories || [],
-      priceFrom: packageData.priceFrom || packageData.price || null,
-      pricePerPerson: packageData.pricePerPerson || null,
-      totalPrice: packageData.totalPrice || packageData.price || null,
-      departureDate: packageData.departureDate || "",
-      returnDate: packageData.returnDate || "",
-      availability: packageData.availability || null,
-      inclusions: packageData.inclusions || packageData.included || [],
-      exclusions: packageData.exclusions || packageData.excluded || [],
-      itinerary: packageData.itinerary || packageData.schedule || [],
-      accommodations: packageData.accommodations || packageData.hotels || [],
-      transports: packageData.transports || packageData.transport || [],
-      activities: packageData.activities || packageData.excursions || [],
-      bookingConditions: packageData.bookingConditions || packageData.conditions || null,
-      contact: packageData.contact || null,
-      searchMethod: `Holiday Package API (${usedEndpoint})`,
-      micrositeId: actualMicrositeId,
-      rawData: packageData,
+      id: foundPackage.id?.toString() || holidayPackageId,
+      name: foundPackage.name || foundPackage.title || "Untitled Holiday Package",
+      description: foundPackage.description || foundPackage.longDescription || "",
+      shortDescription: foundPackage.shortDescription || foundPackage.summary || "",
+      imageUrl: foundPackage.imageUrl || foundPackage.mainImage || foundPackage.image || "",
+      duration: foundPackage.duration || foundPackage.numberOfDays || foundPackage.days || 0,
+      destinations: foundPackage.destinations || foundPackage.countries || [],
+      themes: foundPackage.themes || foundPackage.categories || [],
+      priceFrom: foundPackage.priceFrom || foundPackage.price || { amount: 0, currency: "EUR" },
+      pricePerPerson: foundPackage.pricePerPerson || { amount: 0, currency: "EUR" },
+      totalPrice: foundPackage.totalPrice || foundPackage.price || { amount: 0, currency: "EUR" },
+      departureDate: foundPackage.departureDate || "",
+      returnDate: foundPackage.returnDate || "",
+      availability: foundPackage.availability || {
+        available: true,
+        spotsLeft: 0,
+        totalSpots: 0,
+      },
+      inclusions: foundPackage.inclusions || foundPackage.included || [],
+      exclusions: foundPackage.exclusions || foundPackage.notIncluded || [],
+      itinerary: foundPackage.itinerary || foundPackage.dayByDay || [],
+      accommodations: foundPackage.accommodations || foundPackage.hotels || [],
+      transports: foundPackage.transports || foundPackage.flights || [],
+      activities: foundPackage.activities || foundPackage.excursions || [],
+      bookingConditions: foundPackage.bookingConditions || {
+        cancellationPolicy: "Standard cancellation policy",
+        paymentTerms: "Payment required at booking",
+        minimumAge: 0,
+        maximumGroupSize: 50,
+        requiredDocuments: ["Valid passport"],
+      },
+      contact: foundPackage.contact || {
+        tourOperator: "Travel Compositor",
+        phone: "",
+        email: "",
+        website: "",
+      },
     }
 
-    console.log("✅ Transformed package:", JSON.stringify(transformedPackage, null, 2))
+    console.log(`✅ Holiday Package found: ${transformedPackage.name}`)
 
     return NextResponse.json({
       success: true,
       package: transformedPackage,
-      micrositeId: actualMicrositeId,
-      holidayPackageId,
       usedEndpoint,
-      method: "GET",
+      originalData: foundPackage,
     })
   } catch (error) {
-    console.error("❌ Error fetching holiday package:", error)
+    console.error("❌ Error getting holiday package:", error)
     return NextResponse.json(
       {
         success: false,
