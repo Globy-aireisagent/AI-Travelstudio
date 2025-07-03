@@ -21,14 +21,14 @@ export default function ImportPage() {
   const [isImporting, setIsImporting] = useState(false)
   const [importError, setImportError] = useState<string>("")
   const [importSuccess, setImportSuccess] = useState<string>("")
-  const [bookingId, setBookingId] = useState("")
-  const [travelCompositorType, setTravelCompositorType] = useState<string>("booking")
-  const [selectedMicrosite, setSelectedMicrosite] = useState<string>("auto")
 
   // Form states
+  const [bookingId, setBookingId] = useState("")
   const [url, setUrl] = useState("")
   const [file, setFile] = useState<File | null>(null)
   const [manualData, setManualData] = useState("")
+  const [travelCompositorType, setTravelCompositorType] = useState<string>("booking")
+  const [selectedMicrosite, setSelectedMicrosite] = useState<string>("auto")
 
   // Microsites
   const [microsites, setMicrosites] = useState<Microsite[]>([])
@@ -204,52 +204,6 @@ export default function ImportPage() {
         // Redirect to travelwerkblad after a short delay
         setTimeout(() => {
           window.location.href = "/travelwerkblad"
-        }, 2000)
-      } else if (selectedImportType === "travel-compositor" && travelCompositorType === "holiday-package") {
-        console.log("🏖️ Starting Travel Compositor holiday package import...")
-
-        // Prepare the request data - use the correct field names
-        const requestData = {
-          holidayPackageId: bookingId.trim(), // Using bookingId field for package ID
-          micrositeId: selectedMicrosite === "auto" ? "1" : selectedMicrosite, // Always provide a micrositeId
-          config: selectedMicrosite === "auto" ? "1" : selectedMicrosite,
-        }
-
-        console.log("📤 Sending holiday package request:", requestData)
-
-        // Import from Travel Compositor using new API
-        const response = await fetch("/api/import-holiday-package", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestData),
-        })
-
-        console.log("📥 Holiday package response status:", response.status)
-
-        const data = await response.json()
-        console.log("📥 Holiday package response data:", data)
-
-        if (!response.ok) {
-          throw new Error(data.error || "Holiday package import failed")
-        }
-
-        // Show success message
-        setImportSuccess(`✅ Holiday Package ${bookingId} succesvol geïmporteerd!`)
-
-        // Save holiday package data to localStorage for the package-werkblad
-        try {
-          const packageDataString = JSON.stringify(data.package)
-          localStorage.setItem("importedHolidayPackage", packageDataString)
-          console.log("💾 Saved holiday package to localStorage:", packageDataString)
-        } catch (error) {
-          console.error("❌ Failed to save holiday package to localStorage:", error)
-        }
-
-        // Redirect to package-werkblad after a short delay
-        setTimeout(() => {
-          window.location.href = "/package-werkblad"
         }, 2000)
       } else if (selectedImportType === "manual-input") {
         // For manual input, redirect to intake preview
@@ -502,7 +456,7 @@ export default function ImportPage() {
                                   ? "Bijv. RRP-9488, RRP-9487, RRP-9486 (recent bookings)"
                                   : travelCompositorType === "travel-idea"
                                     ? "Bijv. IDEA123456, 12345 (travel idea ID)"
-                                    : "Bijv. PKG123456, HOLIDAY-001 (holiday package ID)"
+                                    : "Bijv. PKG123456"
                               }
                               className="text-lg py-3"
                             />
@@ -511,8 +465,7 @@ export default function ImportPage() {
                                 "Voer je Travel Compositor booking ID of RRP nummer in"}
                               {travelCompositorType === "travel-idea" &&
                                 "Voer je Travel Idea ID in voor reis inspiratie"}
-                              {travelCompositorType === "holiday-package" &&
-                                "Voer je Holiday Package ID in voor vakantie pakketten"}
+                              {travelCompositorType === "holiday-package" && "Voer je Holiday Package ID in"}
                             </p>
                           </div>
 
