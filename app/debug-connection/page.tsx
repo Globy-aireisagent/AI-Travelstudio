@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, RefreshCw, CheckCircle, XCircle, AlertTriangle } from "lucide-react"
+import { Loader2, RefreshCw, CheckCircle, XCircle, AlertTriangle, Clock } from "lucide-react"
 
 interface DebugResult {
   config: string
@@ -17,21 +17,40 @@ interface DebugResult {
 }
 
 export default function DebugConnectionPage() {
-  const [bookingId, setBookingId] = useState("RRP-9263")
+  const [bookingId, setBookingId] = useState("RRP-9571")
   const [isLoading, setIsLoading] = useState(false)
   const [results, setResults] = useState<DebugResult[]>([])
   const [summary, setSummary] = useState<any>(null)
   const [lastTest, setLastTest] = useState<string>("")
+  const [error, setError] = useState<string>("")
 
   const testConnection = async () => {
     setIsLoading(true)
     setResults([])
     setSummary(null)
+    setError("")
 
     try {
       console.log(`🔍 Testing connection for booking: ${bookingId}`)
 
-      const response = await fetch(`/api/debug-booking-status?bookingId=${encodeURIComponent(bookingId)}`)
+      // Set a client-side timeout as well
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        controller.abort()
+        setError("Request timed out after 45 seconds")
+        setIsLoading(false)
+      }, 45000)
+
+      const response = await fetch(`/api/debug-booking-status?bookingId=${encodeURIComponent(bookingId)}`, {
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
       const data = await response.json()
 
       if (data.success) {
@@ -40,12 +59,20 @@ export default function DebugConnectionPage() {
         setLastTest(data.timestamp)
         console.log("✅ Debug test completed:", data)
       } else {
+        setError(data.error || "Unknown error occurred")
         console.error("❌ Debug test failed:", data.error)
-        alert(`Debug test failed: ${data.error}`)
       }
     } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          setError("Request was cancelled due to timeout")
+        } else {
+          setError(error.message)
+        }
+      } else {
+        setError("Unknown error occurred")
+      }
       console.error("❌ Debug connection error:", error)
-      alert(`Connection error: ${error}`)
     } finally {
       setIsLoading(false)
     }
@@ -85,6 +112,8 @@ export default function DebugConnectionPage() {
     return "bg-yellow-100 text-yellow-800"
   }
 
+  const quickTestIds = ["RRP-9571", "RRP-9263", "RRP-7291", "RRP-7288"]
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
       <div className="max-w-6xl mx-auto">
@@ -105,36 +134,81 @@ export default function DebugConnectionPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Booking ID to Test:</label>
-                <Input
-                  value={bookingId}
-                  onChange={(e) => setBookingId(e.target.value)}
-                  placeholder="RRP-9263, RRP-9488, etc."
-                  className="text-lg"
-                />
+            <div className="space-y-4">
+              <div className="flex gap-4 items-end">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Booking ID to Test:</label>
+                  <Input
+                    value={bookingId}
+                    onChange={(e) => setBookingId(e.target.value)}
+                    placeholder="RRP-9571, RRP-9263, etc."
+                    className="text-lg"
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button
+                  onClick={testConnection}
+                  disabled={isLoading || !bookingId.trim()}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Test Connection
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={clearCache}
+                  variant="outline"
+                  className="px-6 py-3 bg-transparent"
+                  disabled={isLoading}
+                >
+                  🧹 Clear Cache
+                </Button>
               </div>
-              <Button
-                onClick={testConnection}
-                disabled={isLoading || !bookingId.trim()}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Testing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Test Connection
-                  </>
-                )}
-              </Button>
-              <Button onClick={clearCache} variant="outline" className="px-6 py-3 bg-transparent">
-                🧹 Clear Cache
-              </Button>
+
+              {/* Quick Test Buttons */}
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-sm text-gray-600 mr-2">Quick test:</span>
+                {quickTestIds.map((id) => (
+                  <Button
+                    key={id}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBookingId(id)}
+                    disabled={isLoading}
+                    className="text-xs"
+                  >
+                    {id}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Loading Progress */}
+              {isLoading && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 text-blue-700">
+                    <Clock className="h-4 w-4" />
+                    <span className="text-sm">Testing connections... This may take up to 45 seconds.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Display */}
+              {error && (
+                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                  <div className="flex items-center gap-2 text-red-700">
+                    <XCircle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Error: {error}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -214,6 +288,9 @@ export default function DebugConnectionPage() {
                           </div>
                           <div>
                             <strong>Client:</strong> {result.bookingData.client}
+                          </div>
+                          <div>
+                            <strong>Status:</strong> {result.bookingData.status}
                           </div>
                         </div>
                       ) : result.error ? (

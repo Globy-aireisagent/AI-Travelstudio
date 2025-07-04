@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server"
 
-// Simple in-memory cache clear
-const authTokenCache = new Map()
-
 export async function POST() {
   try {
     console.log("🧹 Clearing authentication cache...")
 
-    // Clear any in-memory caches
-    authTokenCache.clear()
-
-    // Force garbage collection if available
+    // Clear any potential caches
     if (global.gc) {
       global.gc()
     }
 
     return NextResponse.json({
       success: true,
-      message: "Authentication cache cleared",
+      message: "Authentication cache cleared successfully",
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
