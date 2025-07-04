@@ -2,37 +2,41 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, RefreshCw, CheckCircle, XCircle, AlertTriangle, Clock } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, AlertCircle, RefreshCw, Trash2 } from "lucide-react"
 
-interface DebugResult {
+interface TestResult {
   config: string
   micrositeId: string
   authStatus: string
   bookingFound: string
-  bookingData: any
-  error: string | null
+  bookingData?: any
+  error?: string
+}
+
+interface TestSummary {
+  totalConfigs: number
+  workingConfigs: number
+  foundBooking: number
 }
 
 export default function DebugConnectionPage() {
-  const [bookingId, setBookingId] = useState("RRP-9263")
+  const [bookingId, setBookingId] = useState("RRP-9571")
   const [isLoading, setIsLoading] = useState(false)
-  const [results, setResults] = useState<DebugResult[]>([])
-  const [summary, setSummary] = useState<any>(null)
-  const [lastTest, setLastTest] = useState<string>("")
-  const [error, setError] = useState<string>("")
+  const [results, setResults] = useState<TestResult[]>([])
+  const [summary, setSummary] = useState<TestSummary | null>(null)
+  const [lastTested, setLastTested] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const testConnection = async () => {
     setIsLoading(true)
+    setError(null)
     setResults([])
     setSummary(null)
-    setError("")
 
     try {
-      console.log(`🔍 Testing connection for booking: ${bookingId}`)
-
       const response = await fetch(`/api/debug-booking-status?bookingId=${encodeURIComponent(bookingId)}`)
 
       if (!response.ok) {
@@ -42,21 +46,14 @@ export default function DebugConnectionPage() {
       const data = await response.json()
 
       if (data.success) {
-        setResults(data.results)
-        setSummary(data.summary)
-        setLastTest(data.timestamp)
-        console.log("✅ Debug test completed:", data)
+        setResults(data.results || [])
+        setSummary(data.summary || null)
+        setLastTested(new Date().toLocaleString())
       } else {
         setError(data.error || "Unknown error occurred")
-        console.error("❌ Debug test failed:", data.error)
       }
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError("Unknown error occurred")
-      }
-      console.error("❌ Debug connection error:", error)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error occurred")
     } finally {
       setIsLoading(false)
     }
@@ -64,198 +61,177 @@ export default function DebugConnectionPage() {
 
   const clearCache = async () => {
     try {
-      console.log("🧹 Clearing authentication cache...")
-
-      const response = await fetch("/api/clear-auth-cache", {
-        method: "POST",
-      })
-
+      const response = await fetch("/api/clear-auth-cache", { method: "POST" })
       const data = await response.json()
 
       if (data.success) {
-        alert("✅ Cache cleared successfully!")
-        console.log("✅ Cache cleared:", data)
+        alert("Cache cleared successfully!")
       } else {
-        alert(`❌ Cache clear failed: ${data.error}`)
+        alert("Failed to clear cache: " + data.error)
       }
-    } catch (error) {
-      console.error("❌ Clear cache error:", error)
-      alert(`Clear cache error: ${error}`)
+    } catch (err) {
+      alert("Error clearing cache: " + (err instanceof Error ? err.message : "Unknown error"))
     }
   }
 
+  const quickTest = (id: string) => {
+    setBookingId(id)
+    setTimeout(() => testConnection(), 100)
+  }
+
   const getStatusIcon = (status: string) => {
-    if (status.includes("✅")) return <CheckCircle className="h-4 w-4 text-green-500" />
-    if (status.includes("❌")) return <XCircle className="h-4 w-4 text-red-500" />
-    if (status.includes("⏳")) return <Clock className="h-4 w-4 text-blue-500" />
-    return <AlertTriangle className="h-4 w-4 text-yellow-500" />
+    if (status.includes("SUCCESS") || status.includes("FOUND")) {
+      return <CheckCircle className="h-4 w-4 text-green-600" />
+    } else if (status.includes("ERROR") || status.includes("NOT FOUND")) {
+      return <XCircle className="h-4 w-4 text-red-600" />
+    } else {
+      return <AlertCircle className="h-4 w-4 text-yellow-600" />
+    }
   }
 
   const getStatusColor = (status: string) => {
-    if (status.includes("✅")) return "bg-green-100 text-green-800"
-    if (status.includes("❌")) return "bg-red-100 text-red-800"
-    if (status.includes("⏳")) return "bg-blue-100 text-blue-800"
-    return "bg-yellow-100 text-yellow-800"
+    if (status.includes("SUCCESS") || status.includes("FOUND")) {
+      return "bg-green-100 text-green-800"
+    } else if (status.includes("ERROR") || status.includes("NOT FOUND")) {
+      return "bg-red-100 text-red-800"
+    } else {
+      return "bg-yellow-100 text-yellow-800"
+    }
   }
 
-  const quickTestIds = ["RRP-9571", "RRP-9263", "RRP-7291", "RRP-7288"]
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-            🔧 Connection Debug Tool
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">🔧 Connection Debug Tool</h1>
           <p className="text-gray-600">Test Travel Compositor connections and booking lookups</p>
         </div>
 
-        {/* Test Controls */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <RefreshCw className="h-5 w-5 mr-2" />
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
               Test Configuration
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex gap-4 items-end">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Booking ID to Test:</label>
-                  <Input
-                    value={bookingId}
-                    onChange={(e) => setBookingId(e.target.value)}
-                    placeholder="RRP-9571, RRP-9263, etc."
-                    className="text-lg"
-                    disabled={isLoading}
-                  />
-                </div>
-                <Button
-                  onClick={testConnection}
-                  disabled={isLoading || !bookingId.trim()}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3"
-                >
+          <CardContent className="space-y-4">
+            <div>
+              <label htmlFor="bookingId" className="block text-sm font-medium text-gray-700 mb-2">
+                Booking ID to Test:
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="bookingId"
+                  value={bookingId}
+                  onChange={(e) => setBookingId(e.target.value)}
+                  placeholder="Enter booking ID (e.g., RRP-9571)"
+                  className="flex-1"
+                />
+                <Button onClick={testConnection} disabled={isLoading} className="min-w-[140px]">
                   {isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Testing...
                     </>
                   ) : (
                     <>
-                      <RefreshCw className="h-4 w-4 mr-2" />
+                      <RefreshCw className="mr-2 h-4 w-4" />
                       Test Connection
                     </>
                   )}
                 </Button>
-                <Button
-                  onClick={clearCache}
-                  variant="outline"
-                  className="px-6 py-3 bg-transparent"
-                  disabled={isLoading}
-                >
-                  🧹 Clear Cache
+                <Button onClick={clearCache} variant="outline">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Clear Cache
                 </Button>
               </div>
+            </div>
 
-              {/* Quick Test Buttons */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Quick test:</label>
               <div className="flex gap-2 flex-wrap">
-                <span className="text-sm text-gray-600 mr-2">Quick test:</span>
-                {quickTestIds.map((id) => (
-                  <Button
-                    key={id}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setBookingId(id)}
-                    disabled={isLoading}
-                    className="text-xs"
-                  >
+                {["RRP-9571", "RRP-9263", "RRP-7291", "RRP-7288"].map((id) => (
+                  <Button key={id} variant="outline" size="sm" onClick={() => quickTest(id)} disabled={isLoading}>
                     {id}
                   </Button>
                 ))}
               </div>
-
-              {/* Error Display */}
-              {error && (
-                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                  <div className="flex items-center gap-2 text-red-700">
-                    <XCircle className="h-4 w-4" />
-                    <span className="text-sm font-medium">Error: {error}</span>
-                  </div>
-                </div>
-              )}
             </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                <div className="flex items-center">
+                  <XCircle className="h-5 w-5 text-red-400 mr-2" />
+                  <span className="text-red-800 font-medium">Error: {error}</span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Summary */}
         {summary && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>📊 Test Summary</CardTitle>
+              <CardTitle className="flex items-center gap-2">📊 Test Summary</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
                   <div className="text-2xl font-bold text-blue-600">{summary.totalConfigs}</div>
                   <div className="text-sm text-gray-600">Total Configs</div>
                 </div>
-                <div className="text-center">
+                <div>
                   <div className="text-2xl font-bold text-green-600">{summary.workingConfigs}</div>
                   <div className="text-sm text-gray-600">Working Configs</div>
                 </div>
-                <div className="text-center">
+                <div>
                   <div className="text-2xl font-bold text-purple-600">{summary.foundBooking}</div>
                   <div className="text-sm text-gray-600">Found Booking</div>
                 </div>
               </div>
-              {lastTest && (
-                <p className="text-xs text-gray-500 mt-4 text-center">
-                  Last tested: {new Date(lastTest).toLocaleString()}
-                </p>
-              )}
+              {lastTested && <div className="text-center text-sm text-gray-500 mt-4">Last tested: {lastTested}</div>}
             </CardContent>
           </Card>
         )}
 
-        {/* Results */}
         {results.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">🔍 Detailed Results</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">🔍 Detailed Results</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {results.map((result, index) => (
+                <div key={index} className="border rounded-lg p-4 bg-white">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="text-lg font-semibold">{result.config}</h3>
+                    <span className="text-sm text-gray-500">{result.micrositeId}</span>
+                  </div>
 
-            {results.map((result, index) => (
-              <Card key={index} className="border-l-4 border-l-blue-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{result.config}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {result.micrositeId}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Status */}
                     <div>
-                      <h4 className="font-medium mb-2">Status</h4>
+                      <h4 className="font-medium text-gray-700 mb-2">Status</h4>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           {getStatusIcon(result.authStatus)}
-                          <Badge className={getStatusColor(result.authStatus)}>Auth: {result.authStatus}</Badge>
+                          <span className="text-sm">Auth:</span>
+                          <Badge className={getStatusColor(result.authStatus)}>
+                            {result.authStatus.replace("✅ ", "").replace("❌ ", "")}
+                          </Badge>
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusIcon(result.bookingFound)}
-                          <Badge className={getStatusColor(result.bookingFound)}>Booking: {result.bookingFound}</Badge>
+                          <span className="text-sm">Booking:</span>
+                          <Badge className={getStatusColor(result.bookingFound)}>
+                            {result.bookingFound.replace("✅ ", "").replace("❌ ", "")}
+                          </Badge>
                         </div>
                       </div>
                     </div>
 
-                    {/* Booking Data */}
                     <div>
-                      <h4 className="font-medium mb-2">Details</h4>
+                      <h4 className="font-medium text-gray-700 mb-2">Details</h4>
                       {result.bookingData ? (
-                        <div className="bg-green-50 p-3 rounded-lg text-sm">
+                        <div className="text-sm space-y-1">
                           <div>
                             <strong>ID:</strong> {result.bookingData.id}
                           </div>
@@ -270,34 +246,43 @@ export default function DebugConnectionPage() {
                           </div>
                         </div>
                       ) : result.error ? (
-                        <div className="bg-red-50 p-3 rounded-lg text-sm text-red-700">
-                          <strong>Error:</strong> {result.error}
-                        </div>
+                        <div className="text-sm text-red-600">{result.error}</div>
                       ) : (
-                        <div className="bg-gray-50 p-3 rounded-lg text-sm text-gray-600">Environment check only</div>
+                        <div className="text-sm text-gray-500">Real API test completed</div>
                       )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
 
-        {/* Quick Actions */}
-        <Card className="mt-8">
+        <Card className="mt-6">
           <CardHeader>
-            <CardTitle>🚀 Quick Actions</CardTitle>
+            <CardTitle className="flex items-center gap-2">🚀 Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button onClick={() => window.open("/import", "_blank")} variant="outline" className="w-full">
-                🔄 Go to Import Page
+              <Button
+                variant="outline"
+                className="h-12 bg-transparent"
+                onClick={() => (window.location.href = "/import")}
+              >
+                📋 Go to Import Page
               </Button>
-              <Button onClick={() => window.open("/werkblad", "_blank")} variant="outline" className="w-full">
-                📋 Go to Werkblad
+              <Button
+                variant="outline"
+                className="h-12 bg-transparent"
+                onClick={() => (window.location.href = "/werkblad")}
+              >
+                📄 Go to Werkblad
               </Button>
-              <Button onClick={() => window.open("/agent-dashboard", "_blank")} variant="outline" className="w-full">
+              <Button
+                variant="outline"
+                className="h-12 bg-transparent"
+                onClick={() => (window.location.href = "/dashboard")}
+              >
                 🏠 Go to Dashboard
               </Button>
             </div>
