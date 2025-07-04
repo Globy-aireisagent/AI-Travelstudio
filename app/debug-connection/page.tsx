@@ -17,7 +17,7 @@ interface DebugResult {
 }
 
 export default function DebugConnectionPage() {
-  const [bookingId, setBookingId] = useState("RRP-9571")
+  const [bookingId, setBookingId] = useState("RRP-9263")
   const [isLoading, setIsLoading] = useState(false)
   const [results, setResults] = useState<DebugResult[]>([])
   const [summary, setSummary] = useState<any>(null)
@@ -33,19 +33,7 @@ export default function DebugConnectionPage() {
     try {
       console.log(`🔍 Testing connection for booking: ${bookingId}`)
 
-      // Set a client-side timeout as well
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => {
-        controller.abort()
-        setError("Request timed out after 45 seconds")
-        setIsLoading(false)
-      }, 45000)
-
-      const response = await fetch(`/api/debug-booking-status?bookingId=${encodeURIComponent(bookingId)}`, {
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
+      const response = await fetch(`/api/debug-booking-status?bookingId=${encodeURIComponent(bookingId)}`)
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -64,11 +52,7 @@ export default function DebugConnectionPage() {
       }
     } catch (error) {
       if (error instanceof Error) {
-        if (error.name === "AbortError") {
-          setError("Request was cancelled due to timeout")
-        } else {
-          setError(error.message)
-        }
+        setError(error.message)
       } else {
         setError("Unknown error occurred")
       }
@@ -103,12 +87,14 @@ export default function DebugConnectionPage() {
   const getStatusIcon = (status: string) => {
     if (status.includes("✅")) return <CheckCircle className="h-4 w-4 text-green-500" />
     if (status.includes("❌")) return <XCircle className="h-4 w-4 text-red-500" />
+    if (status.includes("⏳")) return <Clock className="h-4 w-4 text-blue-500" />
     return <AlertTriangle className="h-4 w-4 text-yellow-500" />
   }
 
   const getStatusColor = (status: string) => {
     if (status.includes("✅")) return "bg-green-100 text-green-800"
     if (status.includes("❌")) return "bg-red-100 text-red-800"
+    if (status.includes("⏳")) return "bg-blue-100 text-blue-800"
     return "bg-yellow-100 text-yellow-800"
   }
 
@@ -190,16 +176,6 @@ export default function DebugConnectionPage() {
                 ))}
               </div>
 
-              {/* Loading Progress */}
-              {isLoading && (
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="flex items-center gap-2 text-blue-700">
-                    <Clock className="h-4 w-4" />
-                    <span className="text-sm">Testing connections... This may take up to 45 seconds.</span>
-                  </div>
-                </div>
-              )}
-
               {/* Error Display */}
               {error && (
                 <div className="bg-red-50 p-4 rounded-lg border border-red-200">
@@ -277,7 +253,7 @@ export default function DebugConnectionPage() {
 
                     {/* Booking Data */}
                     <div>
-                      <h4 className="font-medium mb-2">Booking Data</h4>
+                      <h4 className="font-medium mb-2">Details</h4>
                       {result.bookingData ? (
                         <div className="bg-green-50 p-3 rounded-lg text-sm">
                           <div>
@@ -298,7 +274,7 @@ export default function DebugConnectionPage() {
                           <strong>Error:</strong> {result.error}
                         </div>
                       ) : (
-                        <div className="bg-gray-50 p-3 rounded-lg text-sm text-gray-600">No booking data found</div>
+                        <div className="bg-gray-50 p-3 rounded-lg text-sm text-gray-600">Environment check only</div>
                       )}
                     </div>
                   </div>

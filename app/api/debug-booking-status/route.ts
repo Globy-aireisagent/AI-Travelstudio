@@ -1,95 +1,100 @@
 import { NextResponse } from "next/server"
-import { createMultiMicrositeClient } from "@/lib/travel-compositor-client"
+
+// Simple test function to check if our basic setup works
+async function testBasicConnection() {
+  try {
+    // Test environment variables
+    const username1 = process.env.TRAVEL_COMPOSITOR_USERNAME
+    const password1 = process.env.TRAVEL_COMPOSITOR_PASSWORD
+    const micrositeId1 = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+
+    if (!username1 || !password1 || !micrositeId1) {
+      throw new Error("Missing primary environment variables")
+    }
+
+    return {
+      config: "Config 1",
+      micrositeId: micrositeId1,
+      authStatus: "✅ ENV OK",
+      bookingFound: "⏳ PENDING",
+      bookingData: null,
+      error: null,
+    }
+  } catch (error) {
+    return {
+      config: "Config 1",
+      micrositeId: "unknown",
+      authStatus: "❌ ENV ERROR",
+      bookingFound: "❌ ERROR",
+      bookingData: null,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const bookingId = searchParams.get("bookingId") || "RRP-9571"
+  const bookingId = searchParams.get("bookingId") || "RRP-9263"
 
   console.log(`🔍 Debug booking status for: ${bookingId}`)
 
   try {
-    // Set a timeout for the entire operation
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Operation timed out after 30 seconds")), 30000)
-    })
+    // Start with basic environment check
+    const basicTest = await testBasicConnection()
 
-    const debugPromise = async () => {
-      const multiClient = createMultiMicrositeClient()
-      const allClients = multiClient.getAllClients()
+    const results = [basicTest]
 
-      console.log(`📋 Testing ${allClients.length} microsite configurations`)
+    // Try to test additional configs if they exist
+    const configs = [
+      {
+        username: process.env.TRAVEL_COMPOSITOR_USERNAME_2,
+        password: process.env.TRAVEL_COMPOSITOR_PASSWORD_2,
+        micrositeId: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_2,
+        name: "Config 2",
+      },
+      {
+        username: process.env.TRAVEL_COMPOSITOR_USERNAME_3,
+        password: process.env.TRAVEL_COMPOSITOR_PASSWORD_3,
+        micrositeId: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_3,
+        name: "Config 3",
+      },
+      {
+        username: process.env.TRAVEL_COMPOSITOR_USERNAME_4,
+        password: process.env.TRAVEL_COMPOSITOR_PASSWORD_4,
+        micrositeId: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_4,
+        name: "Config 4",
+      },
+    ]
 
-      const results = []
-
-      for (let i = 0; i < allClients.length; i++) {
-        const client = allClients[i]
-        const configName = `Config ${i + 1}`
-
-        try {
-          console.log(`🔍 Testing ${configName} (${client.config.micrositeId})...`)
-
-          // Test authentication with timeout
-          const authPromise = client.authenticate()
-          const authTimeout = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error("Auth timeout")), 10000)
-          })
-
-          await Promise.race([authPromise, authTimeout])
-          console.log(`✅ ${configName} authentication successful`)
-
-          // Test booking search with timeout
-          const bookingPromise = client.getBooking(bookingId)
-          const bookingTimeout = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error("Booking search timeout")), 15000)
-          })
-
-          const booking = await Promise.race([bookingPromise, bookingTimeout])
-
-          results.push({
-            config: configName,
-            micrositeId: client.config.micrositeId,
-            authStatus: "✅ SUCCESS",
-            bookingFound: booking ? "✅ FOUND" : "❌ NOT FOUND",
-            bookingData: booking
-              ? {
-                  id: booking.id,
-                  title: booking.title || booking.name || "No title",
-                  client: booking.client?.name || booking.contactPerson?.name || "No client name",
-                  status: booking.status || "Unknown status",
-                }
-              : null,
-            error: null,
-          })
-
-          console.log(`✅ ${configName} completed - Booking ${booking ? "FOUND" : "NOT FOUND"}`)
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error)
-          console.error(`❌ ${configName} failed:`, errorMessage)
-
-          results.push({
-            config: configName,
-            micrositeId: client.config.micrositeId,
-            authStatus: errorMessage.includes("Auth") ? "❌ AUTH FAILED" : "❌ ERROR",
-            bookingFound: "❌ ERROR",
-            bookingData: null,
-            error: errorMessage,
-          })
-        }
+    for (const config of configs) {
+      if (config.username && config.password && config.micrositeId) {
+        results.push({
+          config: config.name,
+          micrositeId: config.micrositeId,
+          authStatus: "✅ ENV OK",
+          bookingFound: "⏳ PENDING",
+          bookingData: null,
+          error: null,
+        })
+      } else {
+        results.push({
+          config: config.name,
+          micrositeId: config.micrositeId || "missing",
+          authStatus: "❌ ENV MISSING",
+          bookingFound: "❌ ERROR",
+          bookingData: null,
+          error: "Environment variables not configured",
+        })
       }
-
-      return results
     }
-
-    // Race between the debug operation and timeout
-    const results = await Promise.race([debugPromise(), timeoutPromise])
 
     const summary = {
       totalConfigs: results.length,
-      workingConfigs: results.filter((r) => r.authStatus === "✅ SUCCESS").length,
-      foundBooking: results.filter((r) => r.bookingFound === "✅ FOUND").length,
+      workingConfigs: results.filter((r) => r.authStatus === "✅ ENV OK").length,
+      foundBooking: 0, // We're just testing env vars for now
     }
 
-    console.log(`📊 Debug completed:`, summary)
+    console.log(`📊 Basic debug completed:`, summary)
 
     return NextResponse.json({
       success: true,
@@ -97,6 +102,7 @@ export async function GET(request: Request) {
       timestamp: new Date().toISOString(),
       results,
       summary,
+      note: "This is a basic environment variable test. Full API testing will be added once this works.",
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
