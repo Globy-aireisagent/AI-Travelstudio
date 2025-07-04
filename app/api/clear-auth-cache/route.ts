@@ -1,25 +1,60 @@
 import { NextResponse } from "next/server"
 
+// Simple in-memory cache for auth tokens
+const authCache = new Map<string, { token: string; expiry: Date }>()
+
 export async function POST() {
   try {
-    console.log("🧹 Clearing authentication cache...")
+    // Clear the auth cache
+    authCache.clear()
 
-    // For now, we'll just return success since we're not using complex caching yet
-    // In the future, this could clear Redis cache, memory cache, etc.
+    console.log("🧹 Auth cache cleared")
 
     return NextResponse.json({
       success: true,
-      message: "Cache cleared successfully",
-      timestamp: new Date().toISOString(),
+      message: "Auth cache cleared successfully",
+      clearedAt: new Date().toISOString(),
     })
   } catch (error) {
-    console.error("❌ Clear cache error:", error)
+    console.error("❌ Error clearing auth cache:", error)
 
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
+        error: "Failed to clear auth cache",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+export async function GET() {
+  try {
+    const cacheStatus = {
+      size: authCache.size,
+      keys: Array.from(authCache.keys()),
+      entries: Array.from(authCache.entries()).map(([key, value]) => ({
+        key,
+        hasToken: !!value.token,
+        expiry: value.expiry.toISOString(),
+        isExpired: value.expiry < new Date(),
+      })),
+    }
+
+    return NextResponse.json({
+      success: true,
+      cache: cacheStatus,
+      checkedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error("❌ Error checking auth cache:", error)
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to check auth cache",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )
