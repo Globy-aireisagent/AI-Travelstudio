@@ -11,8 +11,6 @@
   "dependencies": {
     "@ai-sdk/openai": "latest",
     "@ai-sdk/react": "latest",
-    "@chakra-ui/react": "latest",
-    "@emotion/react": "latest",
     "@fal-ai/serverless-client": "latest",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.2",
