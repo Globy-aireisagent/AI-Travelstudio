@@ -61,15 +61,45 @@ class SimpleTravelCompositorClient {
 
       console.log(`🔍 Searching booking ${bookingId} in ${this.config.micrositeId}`)
 
-      // Try multiple search patterns
-      const searchEndpoints = [
-        `/resources/booking/${bookingId}`,
-        `/resources/booking/getBookings?microsite=${this.config.micrositeId}&from=20240101&to=20251231&first=0&limit=100`,
+      // Try multiple search strategies with broader date ranges
+      const searchStrategies = [
+        // Direct booking lookup
+        {
+          endpoint: `/resources/booking/${bookingId}`,
+          description: "Direct booking lookup",
+        },
+        // 2025 bookings
+        {
+          endpoint: `/resources/booking/getBookings?microsite=${this.config.micrositeId}&from=2025-01-01&to=2025-12-31&first=0&limit=500`,
+          description: "2025 bookings search",
+        },
+        // 2024 bookings
+        {
+          endpoint: `/resources/booking/getBookings?microsite=${this.config.micrositeId}&from=2024-01-01&to=2024-12-31&first=0&limit=500`,
+          description: "2024 bookings search",
+        },
+        // Broader range (2023-2026)
+        {
+          endpoint: `/resources/booking/getBookings?microsite=${this.config.micrositeId}&from=2023-01-01&to=2026-12-31&first=0&limit=1000`,
+          description: "Broad date range search",
+        },
+        // Alternative format
+        {
+          endpoint: `/resources/booking/getBookings?microsite=${this.config.micrositeId}&from=20230101&to=20261231&first=0&limit=1000`,
+          description: "Alternative date format search",
+        },
+        // Recent bookings (last 500)
+        {
+          endpoint: `/resources/booking/getBookings?microsite=${this.config.micrositeId}&first=0&limit=500`,
+          description: "Recent bookings (no date filter)",
+        },
       ]
 
-      for (const endpoint of searchEndpoints) {
+      for (const strategy of searchStrategies) {
         try {
-          const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
+          console.log(`🔍 Trying: ${strategy.description}`)
+
+          const response = await fetch(`${this.config.baseUrl}${strategy.endpoint}`, {
             method: "GET",
             headers: {
               "auth-token": this.authToken!,
@@ -82,33 +112,65 @@ class SimpleTravelCompositorClient {
             const data = await response.json()
 
             // If it's a direct booking lookup
-            if (endpoint.includes(`/booking/${bookingId}`)) {
-              if (data && data.id) {
+            if (strategy.endpoint.includes(`/booking/${bookingId}`)) {
+              if (data && (data.id || data.bookingReference)) {
                 console.log(`✅ Found booking ${bookingId} directly`)
-                return data
+                return {
+                  ...data,
+                  foundVia: strategy.description,
+                }
               }
             }
 
-            // If it's a search result
+            // If it's a search result with bookedTrip array
             if (data.bookedTrip && Array.isArray(data.bookedTrip)) {
-              const booking = data.bookedTrip.find(
-                (b: any) =>
-                  b.id === bookingId || b.bookingReference === bookingId || b.customBookingReference === bookingId,
-              )
+              console.log(`📊 Found ${data.bookedTrip.length} bookings in ${strategy.description}`)
+
+              const booking = data.bookedTrip.find((b: any) => {
+                const matches = [
+                  b.id === bookingId,
+                  b.bookingReference === bookingId,
+                  b.customBookingReference === bookingId,
+                  b.id?.toString() === bookingId,
+                  b.bookingReference?.toString() === bookingId,
+                ]
+                return matches.some(Boolean)
+              })
 
               if (booking) {
-                console.log(`✅ Found booking ${bookingId} in search results`)
-                return booking
+                console.log(`✅ Found booking ${bookingId} in ${strategy.description}`)
+                return {
+                  ...booking,
+                  foundVia: strategy.description,
+                  totalBookingsInSearch: data.bookedTrip.length,
+                }
+              }
+
+              // Log some booking IDs for debugging
+              if (data.bookedTrip.length > 0) {
+                const sampleIds = data.bookedTrip.slice(0, 5).map((b: any) => b.id || b.bookingReference)
+                console.log(`📝 Sample booking IDs in ${strategy.description}:`, sampleIds)
               }
             }
+
+            // If it's a different response structure
+            if (data.id || data.bookingReference) {
+              console.log(`✅ Found single booking in ${strategy.description}`)
+              return {
+                ...data,
+                foundVia: strategy.description,
+              }
+            }
+          } else {
+            console.log(`⚠️ ${strategy.description} returned ${response.status}`)
           }
         } catch (endpointError) {
-          console.log(`⚠️ Endpoint ${endpoint} failed:`, endpointError)
+          console.log(`⚠️ ${strategy.description} failed:`, endpointError)
           continue
         }
       }
 
-      console.log(`❌ Booking ${bookingId} not found in ${this.config.micrositeId}`)
+      console.log(`❌ Booking ${bookingId} not found in ${this.config.micrositeId} after trying all strategies`)
       return null
     } catch (error) {
       console.error(`❌ Search failed for ${bookingId} in ${this.config.micrositeId}:`, error)
@@ -175,16 +237,16 @@ export async function GET(request: Request) {
         // Test authentication with timeout
         const authPromise = client.authenticate()
         const authTimeout = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Auth timeout after 10s")), 10000)
+          setTimeout(() => reject(new Error("Auth timeout after 15s")), 15000)
         })
 
         await Promise.race([authPromise, authTimeout])
         console.log(`✅ ${config.name} authentication successful`)
 
-        // Test booking search with timeout
+        // Test booking search with longer timeout
         const searchPromise = client.searchBooking(bookingId)
         const searchTimeout = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Search timeout after 15s")), 15000)
+          setTimeout(() => reject(new Error("Search timeout after 30s")), 30000)
         })
 
         const booking = await Promise.race([searchPromise, searchTimeout])
@@ -202,6 +264,8 @@ export async function GET(request: Request) {
                 status: booking.status || "Unknown status",
                 startDate: booking.startDate,
                 endDate: booking.endDate,
+                foundVia: booking.foundVia || "Unknown method",
+                totalBookingsInSearch: booking.totalBookingsInSearch || 0,
               }
             : null,
           error: null,
