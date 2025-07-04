@@ -1,99 +1,75 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { RefreshCw, Webhook, Calendar, User, MapPin, Lightbulb, Package } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
-interface Booking {
+interface WebhookLog {
   id: string
-  bookingReference: string
-  title: string
-  client: { name: string; email: string }
-  destination: string
-  startDate: string
-  endDate: string
-  status: string
-  totalPrice: number
-  currency: string
-  webhookReceivedAt: string
-}
-
-interface TravelIdea {
-  id: string
-  title: string
-  description: string
-  destination: string
-  durationDays: number
-  priceFrom: number
-  priceTo: number
-  currency: string
-  category: string
-  tags: string[]
-  webhookReceivedAt: string
-  micrositeSource: string
+  type: "booking" | "idea" | "package"
+  status: "success" | "error"
+  message: string
+  timestamp: string
+  data?: any
 }
 
 export default function WebhookDashboard() {
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [ideas, setIdeas] = useState<TravelIdea[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("bookings")
+  const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>([])
+  const [bookings, setBookings] = useState<any[]>([])
+  const [ideas, setIdeas] = useState<any[]>([])
+  const [packages, setPackages] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
-  const fetchData = async () => {
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    setIsLoading(true)
     try {
-      setLoading(true)
-      setError(null)
-
-      // Fetch bookings
-      const bookingsResponse = await fetch("/api/bookings?limit=10")
-      const bookingsData = await bookingsResponse.json()
-
-      // Fetch travel ideas
-      const ideasResponse = await fetch("/api/travel-ideas?limit=10")
-      const ideasData = await ideasResponse.json()
-
-      if (bookingsData.success) {
-        setBookings(bookingsData.bookings)
+      // Load bookings
+      const bookingsRes = await fetch("/api/bookings")
+      if (bookingsRes.ok) {
+        const bookingsData = await bookingsRes.json()
+        setBookings(bookingsData.data || [])
       }
 
-      if (ideasData.success) {
-        setIdeas(ideasData.ideas)
+      // Load travel ideas
+      const ideasRes = await fetch("/api/travel-ideas")
+      if (ideasRes.ok) {
+        const ideasData = await ideasRes.json()
+        setIdeas(ideasData.data || [])
       }
-    } catch (err) {
-      setError("Network error")
-      console.error("Error fetching data:", err)
+    } catch (error) {
+      console.error("Error loading data:", error)
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
   const testBookingWebhook = async () => {
+    setIsLoading(true)
     try {
-      const testData = {
+      const testBookingData = {
         booking: {
-          id: `TEST-BOOKING-${Date.now()}`,
-          bookingReference: `TEST-${Date.now()}`,
-          title: "Test Booking via Webhook",
+          id: "TEST-BOOKING-001",
+          bookingReference: "RRP-TEST-001",
+          title: "Test Booking - Amsterdam Weekend",
           contactPerson: {
             name: "Test User",
             email: "test@example.com",
             phone: "+31612345678",
           },
-          startDate: "2025-07-01T00:00:00Z",
-          endDate: "2025-07-08T00:00:00Z",
+          startDate: "2025-06-01",
+          endDate: "2025-06-03",
           status: "CONFIRMED",
           pricebreakdown: {
             totalPrice: {
               microsite: {
-                amount: 1500.0,
+                amount: 450.0,
                 currency: "EUR",
               },
             },
@@ -101,43 +77,72 @@ export default function WebhookDashboard() {
           hotelservice: [
             {
               locationName: "Amsterdam",
-              hotelName: "Test Hotel",
+              destinationName: "Amsterdam",
+              hotelName: "Test Hotel Amsterdam",
+              checkIn: "2025-06-01",
+              checkOut: "2025-06-03",
             },
           ],
+          micrositeId: "test-microsite",
         },
       }
 
       const response = await fetch("/api/webhooks/travel-compositor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(testData),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(testBookingData),
       })
 
+      const result = await response.json()
+
+      const newLog: WebhookLog = {
+        id: Date.now().toString(),
+        type: "booking",
+        status: response.ok ? "success" : "error",
+        message: result.message || result.error || "Unknown response",
+        timestamp: new Date().toISOString(),
+        data: testBookingData,
+      }
+
+      setWebhookLogs((prev) => [newLog, ...prev])
+
       if (response.ok) {
-        await fetchData()
+        await loadData() // Reload data to show new booking
       }
     } catch (error) {
-      console.error("Test booking webhook error:", error)
+      const errorLog: WebhookLog = {
+        id: Date.now().toString(),
+        type: "booking",
+        status: "error",
+        message: `Network error: ${error}`,
+        timestamp: new Date().toISOString(),
+      }
+      setWebhookLogs((prev) => [errorLog, ...prev])
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const testIdeaWebhook = async () => {
+    setIsLoading(true)
     try {
-      const testData = {
+      const testIdeaData = {
         idea: {
-          id: `TEST-IDEA-${Date.now()}`,
-          title: "Amazing City Break in Amsterdam",
-          description: "Discover the charming canals and vibrant culture of Amsterdam",
-          destination: "Amsterdam, Netherlands",
-          durationDays: 4,
+          id: "TEST-IDEA-001",
+          title: "Romantic Weekend in Paris",
+          description: "Experience the city of love with this romantic weekend getaway",
+          destination: "Paris, France",
+          durationDays: 3,
           priceFrom: 299,
           priceTo: 599,
           currency: "EUR",
-          category: "City Break",
-          tags: ["culture", "canals", "museums", "nightlife"],
-          images: ["/placeholder.svg?height=200&width=300"],
-          highlights: ["Anne Frank House", "Van Gogh Museum", "Canal Cruise"],
-          includedServices: ["Hotel", "Breakfast", "City Tour"],
+          category: "Romance",
+          tags: ["romantic", "weekend", "city-break", "culture"],
+          images: ["https://example.com/paris1.jpg", "https://example.com/paris2.jpg"],
+          highlights: ["Visit the Eiffel Tower", "Seine River cruise", "Louvre Museum tour", "Romantic dinner"],
+          includedServices: ["Hotel accommodation", "Breakfast", "City tour"],
           micrositeId: "test-microsite",
           status: "ACTIVE",
         },
@@ -145,225 +150,203 @@ export default function WebhookDashboard() {
 
       const response = await fetch("/api/webhooks/travel-compositor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(testData),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(testIdeaData),
       })
 
+      const result = await response.json()
+
+      const newLog: WebhookLog = {
+        id: Date.now().toString(),
+        type: "idea",
+        status: response.ok ? "success" : "error",
+        message: result.message || result.error || "Unknown response",
+        timestamp: new Date().toISOString(),
+        data: testIdeaData,
+      }
+
+      setWebhookLogs((prev) => [newLog, ...prev])
+
       if (response.ok) {
-        await fetchData()
+        await loadData() // Reload data to show new idea
       }
     } catch (error) {
-      console.error("Test idea webhook error:", error)
+      const errorLog: WebhookLog = {
+        id: Date.now().toString(),
+        type: "idea",
+        status: "error",
+        message: `Network error: ${error}`,
+        timestamp: new Date().toISOString(),
+      }
+      setWebhookLogs((prev) => [errorLog, ...prev])
+    } finally {
+      setIsLoading(false)
     }
   }
 
+  const clearLogs = () => {
+    setWebhookLogs([])
+  }
+
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Webhook className="h-8 w-8" />
-            Webhook Dashboard
-          </h1>
-          <p className="text-muted-foreground">Real-time data received via webhooks</p>
+          <h1 className="text-3xl font-bold">Webhook Dashboard</h1>
+          <p className="text-muted-foreground">Monitor Travel Compositor webhooks and data</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={testBookingWebhook} variant="outline" size="sm">
+          <Button onClick={testBookingWebhook} disabled={isLoading}>
             Test Booking
           </Button>
-          <Button onClick={testIdeaWebhook} variant="outline" size="sm">
+          <Button onClick={testIdeaWebhook} disabled={isLoading}>
             Test Idea
           </Button>
-          <Button onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+          <Button variant="outline" onClick={clearLogs}>
+            Clear Logs
           </Button>
         </div>
       </div>
 
-      {error && (
-        <Card className="mb-6 border-red-200 bg-red-50">
-          <CardContent className="pt-6">
-            <p className="text-red-600">❌ {error}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{bookings.length}</div>
+            <p className="text-xs text-muted-foreground">Via webhooks</p>
           </CardContent>
         </Card>
-      )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="bookings" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Bookings ({bookings.length})
-          </TabsTrigger>
-          <TabsTrigger value="ideas" className="flex items-center gap-2">
-            <Lightbulb className="h-4 w-4" />
-            Travel Ideas ({ideas.length})
-          </TabsTrigger>
-          <TabsTrigger value="packages" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Packages (0)
-          </TabsTrigger>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Travel Ideas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{ideas.length}</div>
+            <p className="text-xs text-muted-foreground">Active ideas</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Webhook Logs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{webhookLogs.length}</div>
+            <p className="text-xs text-muted-foreground">Recent events</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="logs" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="logs">Webhook Logs</TabsTrigger>
+          <TabsTrigger value="bookings">Bookings</TabsTrigger>
+          <TabsTrigger value="ideas">Travel Ideas</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="logs" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Webhook Events</CardTitle>
+              <CardDescription>Latest webhook calls and their status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[400px]">
+                {webhookLogs.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No webhook logs yet. Test a webhook to see logs here.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {webhookLogs.map((log) => (
+                      <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Badge variant={log.status === "success" ? "default" : "destructive"}>{log.type}</Badge>
+                          <div>
+                            <p className="font-medium">{log.message}</p>
+                            <p className="text-sm text-muted-foreground">{new Date(log.timestamp).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <Badge variant={log.status === "success" ? "default" : "destructive"}>{log.status}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="bookings" className="space-y-4">
-          {bookings.length === 0 && !loading ? (
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">
-                  No bookings received yet. Booking webhooks will appear here automatically.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            bookings.map((booking) => (
-              <Card key={booking.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{booking.title}</CardTitle>
-                    <Badge variant={booking.status === "CONFIRMED" ? "default" : "secondary"}>{booking.status}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{booking.bookingReference}</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{booking.client.name}</p>
-                        <p className="text-sm text-muted-foreground">{booking.client.email}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{booking.destination}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {booking.totalPrice > 0 && `${booking.currency} ${booking.totalPrice.toFixed(2)}`}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">
-                          {new Date(booking.startDate).toLocaleDateString()} -{" "}
-                          {new Date(booking.endDate).toLocaleDateString()}
+          <Card>
+            <CardHeader>
+              <CardTitle>Received Bookings</CardTitle>
+              <CardDescription>Bookings received via webhooks</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[400px]">
+                {bookings.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No bookings received yet. Test a booking webhook to see data here.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {bookings.map((booking) => (
+                      <div key={booking.id} className="p-3 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-medium">{booking.title}</h3>
+                          <Badge>{booking.status}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          {booking.booking_reference} • {booking.client_name}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          Received: {new Date(booking.webhookReceivedAt).toLocaleString()}
+                          {booking.destination} • {booking.total_price} {booking.currency}
                         </p>
                       </div>
-                    </div>
+                    ))}
                   </div>
-
-                  <div className="mt-4 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/roadbook/${booking.id}`, "_blank")}
-                    >
-                      View Roadbook
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/bookings/${booking.id}`, "_blank")}
-                    >
-                      View JSON
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="ideas" className="space-y-4">
-          {ideas.length === 0 && !loading ? (
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <Lightbulb className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">
-                  No travel ideas received yet. Idea webhooks will appear here automatically.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            ideas.map((idea) => (
-              <Card key={idea.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{idea.title}</CardTitle>
-                    <Badge variant="secondary">{idea.category}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{idea.description}</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{idea.destination}</p>
-                        <p className="text-sm text-muted-foreground">{idea.durationDays} days</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">💰</span>
-                      <div>
-                        <p className="font-medium">
-                          {idea.currency} {idea.priceFrom} - {idea.priceTo}
-                        </p>
-                        <p className="text-sm text-muted-foreground">Price range</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{idea.micrositeSource}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Received: {new Date(idea.webhookReceivedAt).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {idea.tags.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-1">
-                      {idea.tags.map((tag, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mt-4 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/travel-ideas/${idea.id}`, "_blank")}
-                    >
-                      View Details
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="packages" className="space-y-4">
           <Card>
-            <CardContent className="pt-6 text-center">
-              <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">
-                No holiday packages received yet. Package webhooks will appear here automatically.
-              </p>
+            <CardHeader>
+              <CardTitle>Travel Ideas</CardTitle>
+              <CardDescription>Ideas received via webhooks</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[400px]">
+                {ideas.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No travel ideas received yet. Test an idea webhook to see data here.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {ideas.map((idea) => (
+                      <div key={idea.id} className="p-3 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-medium">{idea.title}</h3>
+                          <Badge variant="secondary">{idea.category}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-1">{idea.description}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {idea.destination} • {idea.duration_days} days • {idea.price_from}-{idea.price_to}{" "}
+                          {idea.currency}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>

@@ -5,45 +5,80 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const ideaId = params.id
-    console.log(`💡 Fetching travel idea: ${ideaId}`)
-
-    const { data, error } = await supabase.from("travel_ideas").select("*").eq("id", ideaId).single()
+    const { data, error } = await supabase.from("travel_ideas").select("*").eq("id", params.id).single()
 
     if (error) {
-      console.error("❌ Supabase error:", error)
+      console.error("❌ Error fetching travel idea:", error)
       return NextResponse.json({ error: "Travel idea not found" }, { status: 404 })
     }
-
-    if (!data) {
-      return NextResponse.json({ error: "Travel idea not found" }, { status: 404 })
-    }
-
-    console.log(`✅ Travel idea found: ${data.id}`)
 
     return NextResponse.json({
       success: true,
-      idea: {
-        id: data.id,
-        title: data.title,
-        description: data.description,
-        destination: data.destination,
-        durationDays: data.duration_days,
-        priceFrom: data.price_from,
-        priceTo: data.price_to,
-        currency: data.currency,
-        category: data.category,
-        tags: data.tags,
-        images: data.images,
-        highlights: data.highlights,
-        includedServices: data.included_services,
-        webhookReceivedAt: data.webhook_received_at,
-        micrositeSource: data.microsite_source,
-        status: data.status,
-      },
+      data: data,
     })
   } catch (error) {
-    console.error("❌ Error fetching travel idea:", error)
-    return NextResponse.json({ error: "Failed to fetch travel idea" }, { status: 500 })
+    console.error("❌ Travel idea GET error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const body = await request.json()
+
+    const { data, error } = await supabase
+      .from("travel_ideas")
+      .update({
+        title: body.title,
+        description: body.description,
+        destination: body.destination,
+        duration_days: body.durationDays,
+        price_from: body.priceFrom,
+        price_to: body.priceTo,
+        currency: body.currency,
+        category: body.category,
+        tags: body.tags,
+        images: body.images,
+        highlights: body.highlights,
+        included_services: body.includedServices,
+        status: body.status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", params.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("❌ Error updating travel idea:", error)
+      return NextResponse.json({ error: "Failed to update travel idea" }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: data,
+      message: "Travel idea updated successfully",
+    })
+  } catch (error) {
+    console.error("❌ Travel idea PUT error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const { error } = await supabase.from("travel_ideas").delete().eq("id", params.id)
+
+    if (error) {
+      console.error("❌ Error deleting travel idea:", error)
+      return NextResponse.json({ error: "Failed to delete travel idea" }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Travel idea deleted successfully",
+    })
+  } catch (error) {
+    console.error("❌ Travel idea DELETE error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

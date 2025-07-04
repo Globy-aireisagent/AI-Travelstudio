@@ -6,19 +6,16 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const limit = Number.parseInt(searchParams.get("limit") || "20")
+    const limit = Number.parseInt(searchParams.get("limit") || "50")
     const offset = Number.parseInt(searchParams.get("offset") || "0")
     const destination = searchParams.get("destination")
     const category = searchParams.get("category")
-    const status = searchParams.get("status") || "ACTIVE"
-
-    console.log(`💡 Fetching travel ideas (limit: ${limit}, offset: ${offset})`)
 
     let query = supabase
       .from("travel_ideas")
       .select("*")
-      .eq("status", status)
-      .order("webhook_received_at", { ascending: false })
+      .eq("status", "ACTIVE")
+      .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1)
 
     if (destination) {
@@ -32,40 +29,60 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query
 
     if (error) {
-      console.error("❌ Supabase error:", error)
+      console.error("❌ Error fetching travel ideas:", error)
       return NextResponse.json({ error: "Failed to fetch travel ideas" }, { status: 500 })
     }
 
-    console.log(`✅ Found ${data?.length || 0} travel ideas`)
+    return NextResponse.json({
+      success: true,
+      data: data || [],
+      total: count || 0,
+      limit,
+      offset,
+    })
+  } catch (error) {
+    console.error("❌ Travel ideas API error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+
+    const { data, error } = await supabase
+      .from("travel_ideas")
+      .insert({
+        title: body.title,
+        description: body.description,
+        destination: body.destination,
+        duration_days: body.durationDays || 7,
+        price_from: body.priceFrom || 0,
+        price_to: body.priceTo || 0,
+        currency: body.currency || "EUR",
+        category: body.category || "General",
+        tags: body.tags || [],
+        images: body.images || [],
+        highlights: body.highlights || [],
+        included_services: body.includedServices || [],
+        microsite_source: body.micrositeSource || "manual",
+        status: "ACTIVE",
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error("❌ Error creating travel idea:", error)
+      return NextResponse.json({ error: "Failed to create travel idea" }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
-      ideas:
-        data?.map((idea) => ({
-          id: idea.id,
-          title: idea.title,
-          description: idea.description,
-          destination: idea.destination,
-          durationDays: idea.duration_days,
-          priceFrom: idea.price_from,
-          priceTo: idea.price_to,
-          currency: idea.currency,
-          category: idea.category,
-          tags: idea.tags,
-          images: idea.images,
-          highlights: idea.highlights,
-          includedServices: idea.included_services,
-          webhookReceivedAt: idea.webhook_received_at,
-          micrositeSource: idea.microsite_source,
-        })) || [],
-      pagination: {
-        limit,
-        offset,
-        total: count || 0,
-      },
+      data: data,
+      message: "Travel idea created successfully",
     })
   } catch (error) {
-    console.error("❌ Error fetching travel ideas:", error)
-    return NextResponse.json({ error: "Failed to fetch travel ideas" }, { status: 500 })
+    console.error("❌ Travel ideas POST error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
