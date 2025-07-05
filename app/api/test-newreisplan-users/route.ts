@@ -1,176 +1,146 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createTravelCompositorClient } from "@/lib/travel-compositor-client"
 
 export async function GET(request: NextRequest) {
   try {
     console.log("👥 Testing Newreisplan users import...")
 
-    const username = process.env.TRAVEL_COMPOSITOR_USERNAME
-    const password = process.env.TRAVEL_COMPOSITOR_PASSWORD
-    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+    const client = createTravelCompositorClient(1)
 
-    if (!username || !password || !micrositeId) {
-      return NextResponse.json({
-        success: false,
-        message: "Missing credentials",
-        error: "Environment variables not configured",
-      })
-    }
+    // Authenticate first
+    await client.authenticate()
+    console.log("✅ Authentication successful")
 
-    const authString = Buffer.from(`${username}:${password}`).toString("base64")
-
-    // First get all agencies
+    // First get agencies using the authenticated client
     console.log("🏢 Getting agencies first...")
-    const agenciesResponse = await fetch(`https://api.travelcompositor.com/api/v1/agency/${micrositeId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Basic ${authString}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-    })
+    const agenciesResponse = await client.makeAuthenticatedRequest(
+      `/resources/agency?microsite=${client.config.micrositeId}&first=0&limit=100`,
+    )
 
-    if (!agenciesResponse.ok) {
-      return NextResponse.json({
-        success: false,
-        message: "Failed to fetch agencies for user lookup",
-        error: `HTTP ${agenciesResponse.status}`,
-      })
+    let agencies = []
+    if (agenciesResponse.ok) {
+      const agenciesData = await agenciesResponse.json()
+      agencies = Array.isArray(agenciesData) ? agenciesData : agenciesData.agencies || []
+      console.log(`✅ Found ${agencies.length} agencies`)
     }
 
-    const agenciesData = await agenciesResponse.json()
-    const agencies = Array.isArray(agenciesData)
-      ? agenciesData
-      : agenciesData.agencies
-        ? agenciesData.agencies
-        : [agenciesData]
-
-    console.log(`🏢 Found ${agencies.length} agencies to check for users`)
-
-    const allUsers: any[] = []
+    const allUsers = []
     let totalBookings = 0
     let totalIdeas = 0
 
-    // Get users from each agency
-    for (const agency of agencies) {
-      const agencyId = agency.id || agency.agencyId
-      if (!agencyId) continue
+    // Get users from all agencies
+    for (const agency of agencies.slice(0, 20)) {
+      // Limit to first 20 agencies for testing
+      try {
+        console.log(`👥 Getting users for agency: ${agency.name} (${agency.id})`)
 
-      console.log(`👥 Checking agency ${agencyId} for users...`)
-
-      // Try multiple endpoints for users
-      const userEndpoints = [
-        `https://api.travelcompositor.com/api/v1/user/${micrositeId}/${agencyId}`,
-        `https://api.travelcompositor.com/api/v1/users/${micrositeId}/${agencyId}`,
-        `https://api.travelcompositor.com/api/v1/agency/${micrositeId}/${agencyId}/users`,
-        `https://api.travelcompositor.com/api/v1/microsite/${micrositeId}/agency/${agencyId}/users`,
-      ]
-
-      let agencyUsers: any[] = []
-
-      for (const endpoint of userEndpoints) {
-        try {
-          console.log(`🔍 Trying users endpoint: ${endpoint}`)
-
-          const response = await fetch(endpoint, {
-            method: "GET",
-            headers: {
-              Authorization: `Basic ${authString}`,
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-          })
-
-          if (response.ok) {
-            const data = await response.json()
-            console.log(`✅ Users endpoint worked: ${endpoint}`)
-
-            if (Array.isArray(data)) {
-              agencyUsers = data
-            } else if (data && typeof data === "object" && data.users) {
-              agencyUsers = data.users
-            } else if (data && typeof data === "object" && data.data) {
-              agencyUsers = data.data
-            }
-
-            if (agencyUsers.length > 0) {
-              console.log(`👥 Found ${agencyUsers.length} users in agency ${agencyId}`)
-              break
-            }
-          }
-        } catch (error) {
-          console.log(`❌ Users endpoint failed: ${endpoint}`, error)
-        }
-      }
-
-      // Add agency info to users and count their content
-      for (const user of agencyUsers) {
-        user.agencyId = agencyId
-        user.agencyName = agency.name || agency.agencyName || `Agency ${agencyId}`
-
-        // Try to get user's bookings and ideas count
-        user.bookings = 0
-        user.ideas = 0
-
-        // Try different endpoints for user content
-        const contentEndpoints = [
-          `https://api.travelcompositor.com/api/v1/booking/${micrositeId}?userId=${user.id}`,
-          `https://api.travelcompositor.com/api/v1/bookings/${micrositeId}/${agencyId}/${user.username}`,
-          `https://api.travelcompositor.com/api/v1/travelideas/${micrositeId}?userId=${user.id}`,
-          `https://api.travelcompositor.com/api/v1/ideas/${micrositeId}/${agencyId}/${user.username}`,
+        // Try multiple user endpoints
+        const userEndpoints = [
+          `/resources/user/${client.config.micrositeId}/${agency.id}`,
+          `/resources/user?microsite=${client.config.micrositeId}&agency=${agency.id}`,
+          `/resources/agency/${client.config.micrositeId}/${agency.id}/users`,
         ]
 
-        for (const contentEndpoint of contentEndpoints) {
+        let agencyUsers = []
+
+        for (const endpoint of userEndpoints) {
           try {
-            const contentResponse = await fetch(contentEndpoint, {
-              method: "GET",
-              headers: {
-                Authorization: `Basic ${authString}`,
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-            })
+            console.log(`🔍 Trying user endpoint: ${endpoint}`)
+            const response = await client.makeAuthenticatedRequest(endpoint)
 
-            if (contentResponse.ok) {
-              const contentData = await contentResponse.json()
+            if (response.ok) {
+              const data = await response.json()
 
-              if (contentEndpoint.includes("booking")) {
-                const bookings = Array.isArray(contentData)
-                  ? contentData
-                  : contentData.bookings
-                    ? contentData.bookings
-                    : []
-                user.bookings = bookings.length
-                totalBookings += bookings.length
-              } else if (contentEndpoint.includes("idea")) {
-                const ideas = Array.isArray(contentData) ? contentData : contentData.ideas ? contentData.ideas : []
-                user.ideas = ideas.length
-                totalIdeas += ideas.length
+              // Handle different response formats
+              if (Array.isArray(data)) {
+                agencyUsers = data
+              } else if (data.users && Array.isArray(data.users)) {
+                agencyUsers = data.users
+              } else if (data.user && Array.isArray(data.user)) {
+                agencyUsers = data.user
+              }
+
+              if (agencyUsers.length > 0) {
+                console.log(`✅ Found ${agencyUsers.length} users with endpoint: ${endpoint}`)
+                break
               }
             }
           } catch (error) {
-            // Silently continue - content counting is optional
+            console.log(`❌ User endpoint error:`, error)
           }
         }
 
-        allUsers.push(user)
-      }
+        // Transform users and get their bookings/ideas count
+        for (const user of agencyUsers) {
+          try {
+            let bookingsCount = 0
+            let ideasCount = 0
 
-      // Small delay between agencies
-      await new Promise((resolve) => setTimeout(resolve, 100))
+            // Try to get user's bookings count
+            try {
+              const bookingsResponse = await client.makeAuthenticatedRequest(
+                `/resources/booking/getBookings?microsite=${client.config.micrositeId}&user=${user.username}&first=0&limit=1`,
+              )
+              if (bookingsResponse.ok) {
+                const bookingsData = await bookingsResponse.json()
+                if (bookingsData.pagination) {
+                  bookingsCount = bookingsData.pagination.totalResults || 0
+                } else if (Array.isArray(bookingsData.bookedTrip)) {
+                  bookingsCount = bookingsData.bookedTrip.length
+                }
+              }
+            } catch (error) {
+              console.log(`⚠️ Could not get bookings for user ${user.username}`)
+            }
+
+            // Try to get user's ideas count
+            try {
+              const ideasResponse = await client.makeAuthenticatedRequest(
+                `/resources/travelideas/${client.config.micrositeId}?user=${user.username}&first=0&limit=1`,
+              )
+              if (ideasResponse.ok) {
+                const ideasData = await ideasResponse.json()
+                if (ideasData.pagination) {
+                  ideasCount = ideasData.pagination.totalResults || 0
+                } else if (Array.isArray(ideasData.travelIdea)) {
+                  ideasCount = ideasData.travelIdea.length
+                }
+              }
+            } catch (error) {
+              console.log(`⚠️ Could not get ideas for user ${user.username}`)
+            }
+
+            totalBookings += bookingsCount
+            totalIdeas += ideasCount
+
+            allUsers.push({
+              username: user.username,
+              email: user.email || user.username,
+              agencyName: agency.name,
+              bookings: bookingsCount,
+              ideas: ideasCount,
+            })
+          } catch (error) {
+            console.log(`❌ Error processing user ${user.username}:`, error)
+          }
+        }
+
+        console.log(`✅ Processed ${agencyUsers.length} users from ${agency.name}`)
+      } catch (error) {
+        console.log(`❌ Error getting users for agency ${agency.name}:`, error)
+      }
     }
 
-    console.log(`🎉 Total users found: ${allUsers.length}`)
-    console.log(`📊 Total bookings: ${totalBookings}`)
-    console.log(`💡 Total ideas: ${totalIdeas}`)
+    console.log(`🎯 Final result: ${allUsers.length} users found`)
 
     return NextResponse.json({
       success: true,
-      message: `Found ${allUsers.length} users across ${agencies.length} agencies`,
+      message: `Successfully imported ${allUsers.length} users`,
       data: {
         users: allUsers,
         summary: {
           totalUsers: allUsers.length,
-          totalAgencies: agencies.length,
+          totalAgencies: Math.min(agencies.length, 20),
           totalBookings,
           totalIdeas,
           totalItems: totalBookings + totalIdeas,
@@ -178,11 +148,10 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("💥 Users test error:", error)
-
+    console.error("❌ Users import test failed:", error)
     return NextResponse.json({
       success: false,
-      message: "Error fetching users",
+      message: "Users import test failed",
       error: error instanceof Error ? error.message : "Unknown error",
     })
   }

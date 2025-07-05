@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createTravelCompositorClient } from "@/lib/travel-compositor-client"
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,36 +16,57 @@ export async function GET(request: NextRequest) {
 
     console.log(`🎫 Testing booking import for ID: ${bookingId}`)
 
-    const username = process.env.TRAVEL_COMPOSITOR_USERNAME
-    const password = process.env.TRAVEL_COMPOSITOR_PASSWORD
-    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+    const client = createTravelCompositorClient(1)
 
-    if (!username || !password || !micrositeId) {
-      return NextResponse.json({
-        success: false,
-        message: "Missing credentials",
-        error: "Environment variables not configured",
-      })
+    // Authenticate first
+    await client.authenticate()
+    console.log("✅ Authentication successful")
+
+    // Try to get the booking using the client's getBooking method
+    try {
+      const booking = await client.getBooking(bookingId)
+
+      if (booking) {
+        console.log(`✅ Found booking: ${booking.id}`)
+        return NextResponse.json({
+          success: true,
+          message: `Booking ${bookingId} found successfully`,
+          data: {
+            booking: {
+              id: booking.id,
+              bookingReference: booking.bookingReference,
+              title: booking.title,
+              clientName: booking.client?.name,
+              clientEmail: booking.client?.email,
+              status: booking.status,
+              totalPrice: booking.totalPrice,
+              startDate: booking.period?.startDate,
+              endDate: booking.period?.endDate,
+            },
+            foundWith: "client.getBooking()",
+          },
+        })
+      }
+    } catch (error) {
+      console.log(`❌ Error with client.getBooking():`, error)
     }
 
-    const authString = Buffer.from(`${username}:${password}`).toString("base64")
+    // If client.getBooking() didn't work, try direct API calls
+    console.log("🔍 Trying direct API calls...")
 
     // Try different ID formats and endpoints
     const idVariations = [
       bookingId,
       `RRP-${bookingId}`,
       `NRP-${bookingId}`,
-      `TC-${bookingId}`,
-      bookingId.replace(/^(RRP-|NRP-|TC-)/, ""), // Remove prefix if exists
+      bookingId.replace(/^(RRP-|NRP-)/, ""), // Remove prefix if exists
     ]
 
     const endpointTemplates = [
-      "https://api.travelcompositor.com/api/v1/booking/{micrositeId}/{bookingId}",
-      "https://api.travelcompositor.com/api/v1/bookings/{micrositeId}/{bookingId}",
-      "https://api.travelcompositor.com/api/v1/booking/{bookingId}",
-      "https://api.travelcompositor.com/api/v1/bookings/{bookingId}",
-      "https://api.travelcompositor.com/api/v1/microsite/{micrositeId}/booking/{bookingId}",
-      "https://api.travelcompositor.com/api/v1/microsite/{micrositeId}/bookings/{bookingId}",
+      `/resources/booking/{bookingId}`,
+      `/resources/booking/getBooking?microsite=${client.config.micrositeId}&bookingId={bookingId}`,
+      `/resources/booking/getBookings?microsite=${client.config.micrositeId}&bookingReference={bookingId}`,
+      `/resources/booking/${client.config.micrositeId}/{bookingId}`,
     ]
 
     let foundBooking = null
@@ -55,19 +77,12 @@ export async function GET(request: NextRequest) {
       console.log(`🔍 Trying ID variation: ${idVariation}`)
 
       for (const template of endpointTemplates) {
-        const endpoint = template.replace("{micrositeId}", micrositeId).replace("{bookingId}", idVariation)
+        const endpoint = template.replace("{bookingId}", idVariation)
 
         console.log(`🌐 Testing endpoint: ${endpoint}`)
 
         try {
-          const response = await fetch(endpoint, {
-            method: "GET",
-            headers: {
-              Authorization: `Basic ${authString}`,
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-          })
+          const response = await client.makeAuthenticatedRequest(endpoint)
 
           console.log(`📡 Response status: ${response.status}`)
 
@@ -75,9 +90,19 @@ export async function GET(request: NextRequest) {
             const data = await response.json()
             console.log(`✅ Found booking at: ${endpoint}`)
 
-            foundBooking = data
-            successfulEndpoint = endpoint
-            break
+            // Handle different response formats
+            if (data.id || data.bookingReference) {
+              foundBooking = data
+            } else if (data.bookedTrip && Array.isArray(data.bookedTrip) && data.bookedTrip.length > 0) {
+              foundBooking = data.bookedTrip[0]
+            } else if (data.booking) {
+              foundBooking = data.booking
+            }
+
+            if (foundBooking) {
+              successfulEndpoint = endpoint
+              break
+            }
           } else if (response.status === 404) {
             console.log(`❌ Not found: ${endpoint}`)
           } else {
@@ -94,67 +119,20 @@ export async function GET(request: NextRequest) {
       if (foundBooking) break
     }
 
-    // If still not found, try searching through booking lists
-    if (!foundBooking) {
-      console.log("🔍 Booking not found directly, searching through booking lists...")
-
-      const searchEndpoints = [
-        `https://api.travelcompositor.com/api/v1/booking/${micrositeId}`,
-        `https://api.travelcompositor.com/api/v1/bookings/${micrositeId}`,
-        `https://api.travelcompositor.com/api/v1/microsite/${micrositeId}/bookings`,
-      ]
-
-      for (const searchEndpoint of searchEndpoints) {
-        try {
-          console.log(`🔍 Searching in: ${searchEndpoint}`)
-
-          const response = await fetch(searchEndpoint, {
-            method: "GET",
-            headers: {
-              Authorization: `Basic ${authString}`,
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-          })
-
-          if (response.ok) {
-            const data = await response.json()
-            const bookings = Array.isArray(data) ? data : data.bookings ? data.bookings : data.data ? data.data : []
-
-            console.log(`📋 Found ${bookings.length} bookings to search through`)
-
-            // Search for our booking ID in the list
-            for (const booking of bookings) {
-              const bookingRef = booking.id || booking.bookingId || booking.reference || booking.bookingReference
-
-              if (
-                bookingRef &&
-                (bookingRef.toString() === bookingId ||
-                  bookingRef.toString() === `RRP-${bookingId}` ||
-                  bookingRef.toString() === `NRP-${bookingId}` ||
-                  bookingRef.toString().replace(/^(RRP-|NRP-|TC-)/, "") === bookingId)
-              ) {
-                console.log(`✅ Found booking in list: ${bookingRef}`)
-                foundBooking = booking
-                successfulEndpoint = `${searchEndpoint} (found in list)`
-                break
-              }
-            }
-
-            if (foundBooking) break
-          }
-        } catch (error) {
-          console.log(`💥 Search error: ${searchEndpoint}`, error)
-        }
-      }
-    }
-
     if (foundBooking) {
       return NextResponse.json({
         success: true,
         message: `Booking ${bookingId} found successfully`,
         data: {
-          booking: foundBooking,
+          booking: {
+            id: foundBooking.id || foundBooking.bookingReference,
+            bookingReference: foundBooking.bookingReference || foundBooking.id,
+            title: foundBooking.title || foundBooking.name,
+            clientName: foundBooking.client?.name || foundBooking.clientName,
+            clientEmail: foundBooking.client?.email || foundBooking.clientEmail,
+            status: foundBooking.status,
+            totalPrice: foundBooking.totalPrice?.amount || foundBooking.totalPrice,
+          },
           foundAt: successfulEndpoint,
           searchedVariations: idVariations,
         },

@@ -1,79 +1,47 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createTravelCompositorClient } from "@/lib/travel-compositor-client"
 
 export async function GET(request: NextRequest) {
   try {
     console.log("🔐 Testing Newreisplan authentication...")
 
-    const username = process.env.TRAVEL_COMPOSITOR_USERNAME
-    const password = process.env.TRAVEL_COMPOSITOR_PASSWORD
-    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+    // Use the Travel Compositor client which has the correct authentication flow
+    const client = createTravelCompositorClient(1)
 
-    if (!username || !password || !micrositeId) {
-      return NextResponse.json({
-        success: false,
-        message: "Missing credentials in environment variables",
-        error: "TRAVEL_COMPOSITOR_USERNAME, TRAVEL_COMPOSITOR_PASSWORD, or TRAVEL_COMPOSITOR_MICROSITE_ID not found",
-      })
-    }
-
-    console.log("📋 Using credentials:", {
-      username: username.substring(0, 3) + "***",
-      micrositeId,
-      hasPassword: !!password,
+    console.log("📋 Client config:", {
+      baseUrl: client.config.baseUrl,
+      micrositeId: client.config.micrositeId,
+      username: client.config.username ? "***" : "missing",
     })
 
-    // Test authentication with a simple endpoint
-    const authString = Buffer.from(`${username}:${password}`).toString("base64")
+    // Test authentication using the client's authenticate method
+    const token = await client.authenticate()
 
-    const testUrl = `https://api.travelcompositor.com/api/v1/agency/${micrositeId}`
-    console.log("🌐 Testing URL:", testUrl)
-
-    const response = await fetch(testUrl, {
-      method: "GET",
-      headers: {
-        Authorization: `Basic ${authString}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-    })
-
-    console.log("📡 Response status:", response.status)
-    console.log("📡 Response headers:", Object.fromEntries(response.headers.entries()))
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("❌ Auth failed:", errorText)
-
+    if (token) {
+      console.log("✅ Authentication successful")
       return NextResponse.json({
-        success: false,
-        message: `Authentication failed (${response.status})`,
-        error: errorText || `HTTP ${response.status}`,
+        success: true,
+        message: "Authentication successful with Travel Compositor",
         data: {
-          status: response.status,
-          statusText: response.statusText,
-          url: testUrl,
+          micrositeId: client.config.micrositeId,
+          tokenLength: token.length,
+          hasToken: !!token,
+          baseUrl: client.config.baseUrl,
         },
       })
+    } else {
+      console.log("❌ No token received")
+      return NextResponse.json({
+        success: false,
+        message: "No authentication token received",
+        error: "Authentication failed - no token returned",
+      })
     }
-
-    const data = await response.json()
-    console.log("✅ Auth successful, response:", data)
-
-    return NextResponse.json({
-      success: true,
-      message: "Authentication successful",
-      data: {
-        micrositeId,
-        responseData: data,
-        status: response.status,
-      },
-    })
   } catch (error) {
-    console.error("💥 Auth test error:", error)
-
+    console.error("❌ Authentication test failed:", error)
     return NextResponse.json({
       success: false,
-      message: "Network or server error during authentication",
+      message: "Authentication test failed",
       error: error instanceof Error ? error.message : "Unknown error",
     })
   }

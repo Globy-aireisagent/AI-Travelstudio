@@ -1,142 +1,110 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createTravelCompositorClient } from "@/lib/travel-compositor-client"
 
 export async function GET(request: NextRequest) {
   try {
     console.log("🏢 Testing Newreisplan agencies import...")
 
-    const username = process.env.TRAVEL_COMPOSITOR_USERNAME
-    const password = process.env.TRAVEL_COMPOSITOR_PASSWORD
-    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+    const client = createTravelCompositorClient(1)
 
-    if (!username || !password || !micrositeId) {
-      return NextResponse.json({
-        success: false,
-        message: "Missing credentials",
-        error: "Environment variables not configured",
-      })
-    }
+    // Authenticate first
+    await client.authenticate()
+    console.log("✅ Authentication successful")
 
-    const authString = Buffer.from(`${username}:${password}`).toString("base64")
-    const allAgencies: any[] = []
-    let page = 1
-    const pageSize = 100
+    const agencies = []
+    let currentPage = 0
     let hasMore = true
+    const pageSize = 100
 
-    console.log("📄 Starting paginated agency fetch...")
+    console.log("📋 Fetching agencies with pagination...")
 
-    while (hasMore && page <= 10) {
+    while (hasMore && currentPage < 10) {
       // Safety limit
-      const url = `https://api.travelcompositor.com/api/v1/agency/${micrositeId}?page=${page}&pageSize=${pageSize}`
-      console.log(`📄 Fetching page ${page}:`, url)
+      const firstResult = currentPage * pageSize
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Basic ${authString}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      })
+      console.log(`📄 Fetching page ${currentPage + 1} (results ${firstResult}-${firstResult + pageSize - 1})`)
 
-      if (!response.ok) {
-        console.error(`❌ Page ${page} failed:`, response.status)
-        break
-      }
-
-      const data = await response.json()
-      console.log(`📄 Page ${page} response:`, {
-        type: typeof data,
-        isArray: Array.isArray(data),
-        length: Array.isArray(data) ? data.length : "not array",
-        keys: typeof data === "object" ? Object.keys(data) : "not object",
-      })
-
-      if (Array.isArray(data)) {
-        allAgencies.push(...data)
-        hasMore = data.length === pageSize
-        console.log(`✅ Page ${page}: ${data.length} agencies, total: ${allAgencies.length}`)
-      } else if (data && typeof data === "object") {
-        // Handle different response formats
-        if (data.agencies && Array.isArray(data.agencies)) {
-          allAgencies.push(...data.agencies)
-          hasMore = data.agencies.length === pageSize
-        } else if (data.data && Array.isArray(data.data)) {
-          allAgencies.push(...data.data)
-          hasMore = data.data.length === pageSize
-        } else {
-          console.log("🔍 Unexpected response format, treating as single agency")
-          allAgencies.push(data)
-          hasMore = false
-        }
-      } else {
-        console.log("❌ Unexpected response type")
-        hasMore = false
-      }
-
-      page++
-
-      // Small delay between requests
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    }
-
-    console.log(`🎉 Total agencies found: ${allAgencies.length}`)
-
-    // Try alternative endpoints if we got no results
-    if (allAgencies.length === 0) {
-      console.log("🔄 Trying alternative endpoints...")
-
-      const alternativeUrls = [
-        `https://api.travelcompositor.com/api/v1/agencies/${micrositeId}`,
-        `https://api.travelcompositor.com/api/v1/microsite/${micrositeId}/agencies`,
-        `https://api.travelcompositor.com/api/v1/agency?micrositeId=${micrositeId}`,
+      // Try multiple agency endpoints using the authenticated client
+      const endpoints = [
+        `/resources/agency?microsite=${client.config.micrositeId}&first=${firstResult}&limit=${pageSize}`,
+        `/resources/agency/getAgencies?microsite=${client.config.micrositeId}&first=${firstResult}&limit=${pageSize}`,
+        `/resources/agency/${client.config.micrositeId}?first=${firstResult}&limit=${pageSize}`,
       ]
 
-      for (const altUrl of alternativeUrls) {
-        console.log("🔄 Trying:", altUrl)
+      let pageAgencies = []
+
+      for (const endpoint of endpoints) {
         try {
-          const response = await fetch(altUrl, {
-            method: "GET",
-            headers: {
-              Authorization: `Basic ${authString}`,
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-          })
+          console.log(`🔍 Trying endpoint: ${endpoint}`)
+          const response = await client.makeAuthenticatedRequest(endpoint)
 
           if (response.ok) {
             const data = await response.json()
-            console.log("✅ Alternative endpoint worked:", altUrl)
+            console.log("📊 Response structure:", Object.keys(data))
 
+            // Handle different response formats
             if (Array.isArray(data)) {
-              allAgencies.push(...data)
-            } else if (data && typeof data === "object" && data.agencies) {
-              allAgencies.push(...data.agencies)
+              pageAgencies = data
+            } else if (data.agencies && Array.isArray(data.agencies)) {
+              pageAgencies = data.agencies
+            } else if (data.agency && Array.isArray(data.agency)) {
+              pageAgencies = data.agency
+            } else if (data.results && Array.isArray(data.results)) {
+              pageAgencies = data.results
             }
-            break
+
+            if (pageAgencies.length > 0) {
+              console.log(`✅ Found ${pageAgencies.length} agencies with endpoint: ${endpoint}`)
+              break
+            }
+          } else {
+            console.log(`❌ Endpoint failed: ${response.status}`)
           }
         } catch (error) {
-          console.log("❌ Alternative endpoint failed:", altUrl, error)
+          console.log(`❌ Endpoint error:`, error)
         }
+      }
+
+      if (pageAgencies.length > 0) {
+        // Transform and add agencies
+        const transformedAgencies = pageAgencies.map((agency: any) => ({
+          id: agency.id || agency.agencyId,
+          name: agency.name || agency.agencyName || "Unknown Agency",
+          email: agency.email || agency.contactEmail || "No email",
+        }))
+
+        agencies.push(...transformedAgencies)
+        console.log(
+          `✅ Page ${currentPage + 1}: Added ${transformedAgencies.length} agencies (total: ${agencies.length})`,
+        )
+
+        // Check if we should continue
+        hasMore = pageAgencies.length === pageSize
+        currentPage++
+      } else {
+        console.log(`⚪ No agencies found on page ${currentPage + 1}`)
+        hasMore = false
       }
     }
 
+    console.log(`🎯 Final result: ${agencies.length} agencies found`)
+
     return NextResponse.json({
       success: true,
-      message: `Found ${allAgencies.length} agencies`,
+      message: `Successfully imported ${agencies.length} agencies`,
       data: {
-        agencies: allAgencies,
+        agencies: agencies,
         summary: {
-          totalAgencies: allAgencies.length,
-          pagesChecked: page - 1,
+          totalAgencies: agencies.length,
+          pagesProcessed: currentPage,
         },
       },
     })
   } catch (error) {
-    console.error("💥 Agencies test error:", error)
-
+    console.error("❌ Agencies import test failed:", error)
     return NextResponse.json({
       success: false,
-      message: "Error fetching agencies",
+      message: "Agencies import test failed",
       error: error instanceof Error ? error.message : "Unknown error",
     })
   }
