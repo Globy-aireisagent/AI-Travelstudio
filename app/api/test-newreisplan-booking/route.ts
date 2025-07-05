@@ -1,77 +1,117 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { bookingId } = await request.json()
+    const { searchParams } = new URL(request.url)
+    const bookingId = searchParams.get("id")
 
     if (!bookingId) {
       return NextResponse.json({
         success: false,
-        error: "Booking ID is required",
+        message: "No booking ID provided",
+        error: "Missing 'id' parameter",
       })
     }
 
-    console.log(`📋 Testing booking import for: ${bookingId}`)
+    console.log(`🎫 Testing booking import for ID: ${bookingId}`)
 
-    // Authenticeer eerst
-    const credentials = {
-      username: process.env.TRAVEL_COMPOSITOR_USERNAME!,
-      password: process.env.TRAVEL_COMPOSITOR_PASSWORD!,
-      micrositeId: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID!,
+    const username = process.env.TRAVEL_COMPOSITOR_USERNAME
+    const password = process.env.TRAVEL_COMPOSITOR_PASSWORD
+    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+
+    if (!username || !password || !micrositeId) {
+      return NextResponse.json({
+        success: false,
+        message: "Missing credentials",
+        error: "Environment variables not configured",
+      })
     }
 
-    const authResponse = await fetch("https://online.travelcompositor.com/resources/authentication/authenticate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(credentials),
-    })
+    const authString = Buffer.from(`${username}:${password}`).toString("base64")
 
-    if (!authResponse.ok) {
-      throw new Error(`Authentication failed: ${authResponse.status}`)
+    // Try different ID formats and endpoints
+    const idVariations = [
+      bookingId,
+      `RRP-${bookingId}`,
+      `NRP-${bookingId}`,
+      `TC-${bookingId}`,
+      bookingId.replace(/^(RRP-|NRP-|TC-)/, ""), // Remove prefix if exists
+    ]
+
+    const endpointTemplates = [
+      "https://api.travelcompositor.com/api/v1/booking/{micrositeId}/{bookingId}",
+      "https://api.travelcompositor.com/api/v1/bookings/{micrositeId}/{bookingId}",
+      "https://api.travelcompositor.com/api/v1/booking/{bookingId}",
+      "https://api.travelcompositor.com/api/v1/bookings/{bookingId}",
+      "https://api.travelcompositor.com/api/v1/microsite/{micrositeId}/booking/{bookingId}",
+      "https://api.travelcompositor.com/api/v1/microsite/{micrositeId}/bookings/{bookingId}",
+    ]
+
+    let foundBooking = null
+    let successfulEndpoint = null
+
+    // Try each ID variation with each endpoint
+    for (const idVariation of idVariations) {
+      console.log(`🔍 Trying ID variation: ${idVariation}`)
+
+      for (const template of endpointTemplates) {
+        const endpoint = template.replace("{micrositeId}", micrositeId).replace("{bookingId}", idVariation)
+
+        console.log(`🌐 Testing endpoint: ${endpoint}`)
+
+        try {
+          const response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              Authorization: `Basic ${authString}`,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          })
+
+          console.log(`📡 Response status: ${response.status}`)
+
+          if (response.ok) {
+            const data = await response.json()
+            console.log(`✅ Found booking at: ${endpoint}`)
+
+            foundBooking = data
+            successfulEndpoint = endpoint
+            break
+          } else if (response.status === 404) {
+            console.log(`❌ Not found: ${endpoint}`)
+          } else {
+            console.log(`⚠️ Error ${response.status}: ${endpoint}`)
+          }
+        } catch (error) {
+          console.log(`💥 Network error: ${endpoint}`, error)
+        }
+
+        // Small delay between requests
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+
+      if (foundBooking) break
     }
 
-    const authData = await authResponse.json()
-    const token = authData.token
+    // If still not found, try searching through booking lists
+    if (!foundBooking) {
+      console.log("🔍 Booking not found directly, searching through booking lists...")
 
-    // Probeer verschillende variaties van het booking ID
-    const originalId = bookingId.toString()
-    const cleanId = originalId.replace(/^(RRP-?|NRP-?)/i, "")
-    const withRRP = `RRP-${cleanId}`
-    const withNRP = `NRP-${cleanId}`
-
-    const idsToTry = [originalId, cleanId, withRRP, withNRP]
-
-    console.log(`🔍 Trying booking IDs: ${idsToTry.join(", ")}`)
-
-    // Probeer verschillende endpoints voor elke ID variant
-    for (const idToTry of idsToTry) {
-      const endpoints = [
-        // Direct booking lookup
-        `https://online.travelcompositor.com/resources/booking/${credentials.micrositeId}/${idToTry}`,
-
-        // Search endpoints
-        `https://online.travelcompositor.com/resources/booking/${credentials.micrositeId}?bookingReference=${encodeURIComponent(idToTry)}&first=0&limit=1`,
-        `https://online.travelcompositor.com/resources/booking/${credentials.micrositeId}?bookingId=${encodeURIComponent(idToTry)}&first=0&limit=1`,
-        `https://online.travelcompositor.com/resources/booking/${credentials.micrositeId}?id=${encodeURIComponent(idToTry)}&first=0&limit=1`,
-
-        // Alternative formats
-        `https://online.travelcompositor.com/resources/booking/getBooking?microsite=${credentials.micrositeId}&bookingId=${encodeURIComponent(idToTry)}`,
-        `https://online.travelcompositor.com/resources/booking/${idToTry}?microsite=${credentials.micrositeId}`,
-
-        // Search in all bookings (last resort)
-        `https://online.travelcompositor.com/resources/booking/${credentials.micrositeId}?first=0&limit=100`,
+      const searchEndpoints = [
+        `https://api.travelcompositor.com/api/v1/booking/${micrositeId}`,
+        `https://api.travelcompositor.com/api/v1/bookings/${micrositeId}`,
+        `https://api.travelcompositor.com/api/v1/microsite/${micrositeId}/bookings`,
       ]
 
-      for (const [index, endpoint] of endpoints.entries()) {
+      for (const searchEndpoint of searchEndpoints) {
         try {
-          console.log(`🔍 Trying endpoint ${index + 1}/${endpoints.length}: ${endpoint}`)
+          console.log(`🔍 Searching in: ${searchEndpoint}`)
 
-          const response = await fetch(endpoint, {
+          const response = await fetch(searchEndpoint, {
+            method: "GET",
             headers: {
-              "auth-token": token,
+              Authorization: `Basic ${authString}`,
               "Content-Type": "application/json",
               Accept: "application/json",
             },
@@ -79,107 +119,64 @@ export async function POST(request: NextRequest) {
 
           if (response.ok) {
             const data = await response.json()
-            console.log(`📊 Response from ${endpoint}:`, data)
+            const bookings = Array.isArray(data) ? data : data.bookings ? data.bookings : data.data ? data.data : []
 
-            // Check if we got a single booking
-            if (data && (data.id || data.bookingReference || data.bookingId)) {
-              const booking = data
+            console.log(`📋 Found ${bookings.length} bookings to search through`)
+
+            // Search for our booking ID in the list
+            for (const booking of bookings) {
+              const bookingRef = booking.id || booking.bookingId || booking.reference || booking.bookingReference
+
               if (
-                booking.id?.toString() === idToTry ||
-                booking.bookingReference?.toString() === idToTry ||
-                booking.bookingId?.toString() === idToTry
+                bookingRef &&
+                (bookingRef.toString() === bookingId ||
+                  bookingRef.toString() === `RRP-${bookingId}` ||
+                  bookingRef.toString() === `NRP-${bookingId}` ||
+                  bookingRef.toString().replace(/^(RRP-|NRP-|TC-)/, "") === bookingId)
               ) {
-                console.log(`✅ Found exact booking match: ${idToTry}`)
-                return NextResponse.json({
-                  success: true,
-                  data: {
-                    id: booking.id || idToTry,
-                    bookingReference: booking.bookingReference || booking.id || idToTry,
-                    title: booking.title || booking.name || `Booking ${idToTry}`,
-                    client: {
-                      name: booking.client?.name || booking.clientName || "Unknown Client",
-                      email: booking.client?.email || booking.clientEmail || "",
-                    },
-                    destination: booking.destination || "Unknown Destination",
-                    startDate: booking.startDate || booking.departureDate,
-                    endDate: booking.endDate || booking.returnDate,
-                    status: booking.status || "Confirmed",
-                    totalPrice: booking.totalPrice?.amount || booking.totalPrice || 0,
-                    currency: booking.totalPrice?.currency || booking.currency || "EUR",
-                    foundVia: endpoint,
-                    micrositeId: credentials.micrositeId,
-                  },
-                })
+                console.log(`✅ Found booking in list: ${bookingRef}`)
+                foundBooking = booking
+                successfulEndpoint = `${searchEndpoint} (found in list)`
+                break
               }
             }
 
-            // Check if we got an array of bookings
-            if (data && (data.booking || data.bookings)) {
-              const bookings = data.booking || data.bookings || []
-              console.log(`📋 Found ${bookings.length} bookings, searching for ${idToTry}`)
-
-              for (const booking of bookings) {
-                if (
-                  booking.id?.toString() === idToTry ||
-                  booking.bookingReference?.toString() === idToTry ||
-                  booking.bookingId?.toString() === idToTry ||
-                  booking.id?.toString().includes(cleanId) ||
-                  booking.bookingReference?.toString().includes(cleanId)
-                ) {
-                  console.log(`✅ Found booking in array: ${idToTry}`)
-                  return NextResponse.json({
-                    success: true,
-                    data: {
-                      id: booking.id || idToTry,
-                      bookingReference: booking.bookingReference || booking.id || idToTry,
-                      title: booking.title || booking.name || `Booking ${idToTry}`,
-                      client: {
-                        name: booking.client?.name || booking.clientName || "Unknown Client",
-                        email: booking.client?.email || booking.clientEmail || "",
-                      },
-                      destination: booking.destination || "Unknown Destination",
-                      startDate: booking.startDate || booking.departureDate,
-                      endDate: booking.endDate || booking.returnDate,
-                      status: booking.status || "Confirmed",
-                      totalPrice: booking.totalPrice?.amount || booking.totalPrice || 0,
-                      currency: booking.totalPrice?.currency || booking.currency || "EUR",
-                      foundVia: endpoint,
-                      micrositeId: credentials.micrositeId,
-                    },
-                  })
-                }
-              }
-            }
-          } else {
-            console.log(`❌ Endpoint failed: ${response.status} - ${response.statusText}`)
+            if (foundBooking) break
           }
         } catch (error) {
-          console.log(`⚠️ Endpoint error: ${error}`)
-          continue
+          console.log(`💥 Search error: ${searchEndpoint}`, error)
         }
       }
     }
 
-    // Als we hier komen, is de booking niet gevonden
-    console.log(`❌ Booking ${bookingId} not found after trying all endpoints`)
+    if (foundBooking) {
+      return NextResponse.json({
+        success: true,
+        message: `Booking ${bookingId} found successfully`,
+        data: {
+          booking: foundBooking,
+          foundAt: successfulEndpoint,
+          searchedVariations: idVariations,
+        },
+      })
+    } else {
+      return NextResponse.json({
+        success: false,
+        message: `Booking ${bookingId} not found in Newreisplan microsite`,
+        error: "Booking not found after trying all endpoints and ID variations",
+        data: {
+          searchedVariations: idVariations,
+          searchedEndpoints: endpointTemplates.length,
+        },
+      })
+    }
+  } catch (error) {
+    console.error("💥 Booking test error:", error)
 
     return NextResponse.json({
       success: false,
-      error: `Booking ${bookingId} not found in Newreisplan microsite`,
-      debug: {
-        triedIds: idsToTry,
-        micrositeId: credentials.micrositeId,
-        suggestion: "Try a different booking ID or check if the booking exists in the system",
-      },
+      message: "Error testing booking import",
+      error: error instanceof Error ? error.message : "Unknown error",
     })
-  } catch (error) {
-    console.error("❌ Booking test error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred",
-      },
-      { status: 500 },
-    )
   }
 }

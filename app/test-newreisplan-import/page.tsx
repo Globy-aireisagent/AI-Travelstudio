@@ -1,433 +1,399 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Progress } from "@/components/ui/progress"
-import {
-  Building2,
-  Users,
-  Plane,
-  Download,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
-  Database,
-  Key,
-  Globe,
-} from "lucide-react"
+import { CheckCircle, XCircle, Loader2, Users, Building, Plane, Info } from "lucide-react"
 
-interface ImportResult {
+interface TestResult {
   success: boolean
+  message: string
   data?: any
   error?: string
-  debug?: any
 }
 
 export default function TestNewreisplanImport() {
-  const [authTest, setAuthTest] = useState<ImportResult | null>(null)
-  const [agenciesData, setAgenciesData] = useState<ImportResult | null>(null)
-  const [usersData, setUsersData] = useState<ImportResult | null>(null)
-  const [bookingTest, setBookingTest] = useState<ImportResult | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [testBookingId, setTestBookingId] = useState("")
-  const [progress, setProgress] = useState(0)
+  const [authResult, setAuthResult] = useState<TestResult | null>(null)
+  const [agenciesResult, setAgenciesResult] = useState<TestResult | null>(null)
+  const [usersResult, setUsersResult] = useState<TestResult | null>(null)
+  const [bookingResult, setBookingResult] = useState<TestResult | null>(null)
+  const [isLoading, setIsLoading] = useState<string | null>(null)
+  const [bookingId, setBookingId] = useState("29966990")
 
-  const testAuthentication = async () => {
-    setIsLoading(true)
-    setProgress(10)
-
+  const testAuth = async () => {
+    setIsLoading("auth")
     try {
-      const response = await fetch("/api/test-newreisplan-auth", {
-        method: "POST",
-      })
-
+      const response = await fetch("/api/test-newreisplan-auth")
       const result = await response.json()
-      setAuthTest(result)
-      setProgress(25)
+      setAuthResult(result)
     } catch (error) {
-      setAuthTest({
+      setAuthResult({
         success: false,
-        error: error instanceof Error ? error.message : "Network error",
+        message: "Network error",
+        error: error instanceof Error ? error.message : "Unknown error",
       })
+    } finally {
+      setIsLoading(null)
     }
   }
 
   const testAgencies = async () => {
-    setProgress(40)
-
+    setIsLoading("agencies")
     try {
-      const response = await fetch("/api/test-newreisplan-agencies", {
-        method: "POST",
-      })
-
+      const response = await fetch("/api/test-newreisplan-agencies")
       const result = await response.json()
-      setAgenciesData(result)
-      setProgress(60)
+      setAgenciesResult(result)
     } catch (error) {
-      setAgenciesData({
+      setAgenciesResult({
         success: false,
-        error: error instanceof Error ? error.message : "Network error",
+        message: "Network error",
+        error: error instanceof Error ? error.message : "Unknown error",
       })
+    } finally {
+      setIsLoading(null)
     }
   }
 
   const testUsers = async () => {
-    setProgress(75)
-
+    setIsLoading("users")
     try {
-      const response = await fetch("/api/test-newreisplan-users", {
-        method: "POST",
-      })
-
+      const response = await fetch("/api/test-newreisplan-users")
       const result = await response.json()
-      setUsersData(result)
-      setProgress(90)
+      setUsersResult(result)
     } catch (error) {
-      setUsersData({
+      setUsersResult({
         success: false,
-        error: error instanceof Error ? error.message : "Network error",
+        message: "Network error",
+        error: error instanceof Error ? error.message : "Unknown error",
       })
+    } finally {
+      setIsLoading(null)
     }
   }
 
-  const testBookingImport = async () => {
-    if (!testBookingId.trim()) return
+  const testBooking = async () => {
+    if (!bookingId.trim()) return
 
+    setIsLoading("booking")
     try {
-      const response = await fetch("/api/test-newreisplan-booking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: testBookingId.trim() }),
-      })
-
+      const response = await fetch(`/api/test-newreisplan-booking?id=${encodeURIComponent(bookingId)}`)
       const result = await response.json()
-      setBookingTest(result)
+      setBookingResult(result)
     } catch (error) {
-      setBookingTest({
+      setBookingResult({
         success: false,
-        error: error instanceof Error ? error.message : "Network error",
+        message: "Network error",
+        error: error instanceof Error ? error.message : "Unknown error",
       })
+    } finally {
+      setIsLoading(null)
     }
   }
 
   const runFullTest = async () => {
-    setIsLoading(true)
-    setProgress(0)
-    setAuthTest(null)
-    setAgenciesData(null)
-    setUsersData(null)
-
-    await testAuthentication()
-
-    if (authTest?.success !== false) {
-      await testAgencies()
-
-      if (agenciesData?.success !== false) {
-        await testUsers()
-      }
-    }
-
-    setProgress(100)
-    setIsLoading(false)
-
-    setTimeout(() => setProgress(0), 2000)
+    await testAuth()
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await testAgencies()
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await testUsers()
   }
 
-  const getStatusIcon = (result: ImportResult | null) => {
-    if (!result) return <Globe className="w-4 h-4 text-gray-400" />
-    if (result.success) return <CheckCircle className="w-4 h-4 text-green-600" />
-    return <AlertCircle className="w-4 h-4 text-red-600" />
-  }
-
-  const getStatusColor = (result: ImportResult | null) => {
-    if (!result) return "bg-gray-100 text-gray-800"
-    if (result.success) return "bg-green-100 text-green-800"
-    return "bg-red-100 text-red-800"
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-gray-900">Newreisplan Microsite Test</h1>
-          <p className="text-xl text-gray-600">Test de connectie en import functionaliteit</p>
-        </div>
-
-        {/* Credentials Info */}
-        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="w-5 h-5 text-blue-600" />
-              Microsite Credentials Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="flex items-center gap-2 p-3 bg-white rounded-xl border">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <div>
-                  <p className="font-medium text-sm">Username</p>
-                  <p className="text-xs text-gray-600">Configured ✓</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 p-3 bg-white rounded-xl border">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <div>
-                  <p className="font-medium text-sm">Password</p>
-                  <p className="text-xs text-gray-600">Configured ✓</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 p-3 bg-white rounded-xl border">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <div>
-                  <p className="font-medium text-sm">Microsite ID</p>
-                  <p className="text-xs text-gray-600">Configured ✓</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Test Controls */}
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  Connection Tests
-                </CardTitle>
-                <CardDescription>Test alle aspecten van de Newreisplan microsite</CardDescription>
-              </div>
-              <Button onClick={runFullTest} disabled={isLoading} className="flex items-center gap-2">
-                {isLoading ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Testing...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4" />
-                    Run Full Test
-                  </>
+  const ResultCard = ({
+    title,
+    result,
+    icon,
+    isLoading: loading,
+  }: {
+    title: string
+    result: TestResult | null
+    icon: React.ReactNode
+    isLoading: boolean
+  }) => (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {icon}
+          {title}
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {result && (
+            <Badge variant={result.success ? "default" : "destructive"}>{result.success ? "Success" : "Failed"}</Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {result ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-2">
+              {result.success ? (
+                <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
+              )}
+              <div className="flex-1">
+                <p className={result.success ? "text-green-700" : "text-red-700"}>{result.message}</p>
+                {result.error && (
+                  <p className="text-red-600 text-sm mt-1 font-mono bg-red-50 p-2 rounded">{result.error}</p>
                 )}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading && (
-              <div className="mb-6">
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Testing Newreisplan microsite...</span>
-                  <span>{progress}%</span>
-                </div>
-                <Progress value={progress} className="h-2" />
-              </div>
-            )}
-
-            <div className="space-y-4">
-              {/* Authentication Test */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(authTest)}
-                  <div>
-                    <p className="font-medium">1. Authentication Test</p>
-                    <p className="text-sm text-gray-600">Test login credentials</p>
-                    {authTest?.error && <p className="text-xs text-red-600 mt-1">{authTest.error}</p>}
-                  </div>
-                </div>
-                <Badge className={getStatusColor(authTest)}>
-                  {authTest ? (authTest.success ? "Success" : "Failed") : "Pending"}
-                </Badge>
-              </div>
-
-              {/* Agencies Test */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(agenciesData)}
-                  <div>
-                    <p className="font-medium">2. Agencies Import</p>
-                    <p className="text-sm text-gray-600">Fetch all agencies</p>
-                    {agenciesData?.data?.agencies && (
-                      <p className="text-xs text-green-600 mt-1">Found {agenciesData.data.agencies.length} agencies</p>
-                    )}
-                    {agenciesData?.error && <p className="text-xs text-red-600 mt-1">{agenciesData.error}</p>}
-                  </div>
-                </div>
-                <Badge className={getStatusColor(agenciesData)}>
-                  {agenciesData ? (agenciesData.success ? "Success" : "Failed") : "Pending"}
-                </Badge>
-              </div>
-
-              {/* Users Test */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(usersData)}
-                  <div>
-                    <p className="font-medium">3. Users Import</p>
-                    <p className="text-sm text-gray-600">Fetch users from agencies</p>
-                    {usersData?.data?.totalUsers && (
-                      <p className="text-xs text-green-600 mt-1">Found {usersData.data.totalUsers} users</p>
-                    )}
-                    {usersData?.error && <p className="text-xs text-red-600 mt-1">{usersData.error}</p>}
-                  </div>
-                </div>
-                <Badge className={getStatusColor(usersData)}>
-                  {usersData ? (usersData.success ? "Success" : "Failed") : "Pending"}
-                </Badge>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Booking Test */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plane className="h-5 w-5" />
-              Test Booking Import
-            </CardTitle>
-            <CardDescription>Test het importeren van een specifieke booking</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-4">
-              <Input
-                value={testBookingId}
-                onChange={(e) => setTestBookingId(e.target.value)}
-                placeholder="Voer booking ID in (bijv. RRP-1234)"
-                className="flex-1"
-              />
-              <Button onClick={testBookingImport} disabled={!testBookingId.trim()}>
-                Test Import
-              </Button>
-            </div>
-
-            {bookingTest && (
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <div className="flex items-center gap-2 mb-2">
-                  {getStatusIcon(bookingTest)}
-                  <span className="font-medium">Booking Import {bookingTest.success ? "Successful" : "Failed"}</span>
-                </div>
-                {bookingTest.success && bookingTest.data && (
-                  <div className="text-sm text-gray-600">
-                    <p>Booking: {bookingTest.data.title || bookingTest.data.bookingReference}</p>
-                    <p>Client: {bookingTest.data.client?.name || "Unknown"}</p>
-                    <p>Destination: {bookingTest.data.destination || "Unknown"}</p>
-                  </div>
-                )}
-                {bookingTest.error && <p className="text-sm text-red-600">{bookingTest.error}</p>}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Results Display */}
-        {(agenciesData?.success || usersData?.success) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Agencies Results */}
-            {agenciesData?.success && agenciesData.data?.agencies && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
-                    Found Agencies ({agenciesData.data.agencies.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-64">
-                    <div className="space-y-2">
-                      {agenciesData.data.agencies.map((agency: any, index: number) => (
-                        <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                          <p className="font-medium">{agency.name}</p>
-                          <p className="text-sm text-gray-600">ID: {agency.id}</p>
-                          {agency.email && <p className="text-sm text-gray-600">Email: {agency.email}</p>}
+            {result.data && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold mb-2">Results:</h4>
+                {result.data.agencies && (
+                  <div className="mb-4">
+                    <h5 className="font-medium text-gray-700 mb-2">Found Agencies ({result.data.agencies.length})</h5>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {result.data.agencies.slice(0, 5).map((agency: any, index: number) => (
+                        <div key={index} className="bg-white p-3 rounded border">
+                          <div className="font-medium">{agency.name || "Unnamed Agency"}</div>
+                          <div className="text-sm text-gray-600">ID: {agency.id}</div>
+                          <div className="text-sm text-gray-600">Email: {agency.email}</div>
                         </div>
                       ))}
+                      {result.data.agencies.length > 5 && (
+                        <div className="text-sm text-gray-500 text-center py-2">
+                          ... and {result.data.agencies.length - 5} more agencies
+                        </div>
+                      )}
                     </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            )}
+                  </div>
+                )}
 
-            {/* Users Results */}
-            {usersData?.success && usersData.data?.users && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Found Users ({usersData.data.totalUsers})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-64">
-                    <div className="space-y-2">
-                      {usersData.data.users.slice(0, 10).map((user: any, index: number) => (
-                        <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                          <p className="font-medium">
-                            {user.firstName} {user.lastName}
-                          </p>
-                          <p className="text-sm text-gray-600">{user.email}</p>
-                          <p className="text-sm text-gray-600">Agency: {user.agencyName}</p>
-                          <div className="flex gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {user.bookingsCount} bookings
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {user.ideasCount} ideas
-                            </Badge>
+                {result.data.users && (
+                  <div className="mb-4">
+                    <h5 className="font-medium text-gray-700 mb-2">Found Users ({result.data.users.length})</h5>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {result.data.users.slice(0, 5).map((user: any, index: number) => (
+                        <div key={index} className="bg-white p-3 rounded border">
+                          <div className="font-medium">{user.email}</div>
+                          <div className="text-sm text-gray-600">Agency: {user.agencyName}</div>
+                          <div className="text-sm text-gray-600">
+                            <span className="mr-4">{user.bookings || 0} bookings</span>
+                            <span>{user.ideas || 0} ideas</span>
                           </div>
                         </div>
                       ))}
-                      {usersData.data.users.length > 10 && (
-                        <p className="text-sm text-gray-500 text-center p-2">
-                          ... and {usersData.data.users.length - 10} more users
-                        </p>
+                      {result.data.users.length > 5 && (
+                        <div className="text-sm text-gray-500 text-center py-2">
+                          ... and {result.data.users.length - 5} more users
+                        </div>
                       )}
                     </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
+                  </div>
+                )}
+
+                {result.data.booking && (
+                  <div className="mb-4">
+                    <h5 className="font-medium text-gray-700 mb-2">Booking Details</h5>
+                    <div className="bg-white p-3 rounded border">
+                      <div className="font-medium">Booking {result.data.booking.id}</div>
+                      <div className="text-sm text-gray-600">
+                        Client: {result.data.booking.clientName || result.data.booking.clientEmail}
+                      </div>
+                      <div className="text-sm text-gray-600">Status: {result.data.booking.status}</div>
+                      {result.data.booking.totalPrice && (
+                        <div className="text-sm text-gray-600">Price: €{result.data.booking.totalPrice}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {result.data.summary && (
+                  <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                    <h5 className="font-medium text-blue-800 mb-2">Summary</h5>
+                    <div className="text-sm text-blue-700">
+                      <div>Total Agencies: {result.data.summary.totalAgencies}</div>
+                      <div>Total Users: {result.data.summary.totalUsers}</div>
+                      <div>Total Items: {result.data.summary.totalItems}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
+        ) : loading ? (
+          <div className="flex items-center gap-2 text-gray-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Running test...
+          </div>
+        ) : (
+          <p className="text-gray-500">Click the button above to run this test</p>
         )}
+      </CardContent>
+    </Card>
+  )
 
-        {/* Success Summary */}
-        {authTest?.success && agenciesData?.success && usersData?.success && (
-          <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <CheckCircle className="h-8 w-8 text-green-600" />
-                <div>
-                  <h3 className="text-xl font-bold text-green-900">Newreisplan Microsite Ready! 🎉</h3>
-                  <p className="text-green-700">Alle tests zijn succesvol - je kunt nu importeren</p>
-                </div>
-              </div>
+  const allTestsSuccessful = authResult?.success && agenciesResult?.success && usersResult?.success
 
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">{agenciesData.data?.agencies?.length || 0}</p>
-                  <p className="text-sm text-gray-600">Agencies</p>
-                </div>
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">{usersData.data?.totalUsers || 0}</p>
-                  <p className="text-sm text-gray-600">Users</p>
-                </div>
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">
-                    {(usersData.data?.totalBookings || 0) + (usersData.data?.totalIdeas || 0)}
-                  </p>
-                  <p className="text-sm text-gray-600">Total Items</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+  return (
+    <div className="container mx-auto p-6 max-w-4xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Newreisplan Microsite Test</h1>
+        <p className="text-gray-600">Test de connectie en data import van de Newreisplan microsite</p>
       </div>
+
+      {/* Quick Actions */}
+      <div className="mb-8 flex gap-4 flex-wrap">
+        <Button onClick={runFullTest} disabled={isLoading !== null} className="bg-blue-600 hover:bg-blue-700">
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          Run Full Test
+        </Button>
+        <Button onClick={testAuth} disabled={isLoading !== null} variant="outline">
+          Test Auth Only
+        </Button>
+        <Button onClick={testAgencies} disabled={isLoading !== null} variant="outline">
+          Test Agencies Only
+        </Button>
+        <Button onClick={testUsers} disabled={isLoading !== null} variant="outline">
+          Test Users Only
+        </Button>
+      </div>
+
+      {/* Test Results */}
+      <ResultCard
+        title="Authentication Test"
+        result={authResult}
+        icon={<CheckCircle className="h-5 w-5" />}
+        isLoading={isLoading === "auth"}
+      />
+
+      <ResultCard
+        title="Agencies Import Test"
+        result={agenciesResult}
+        icon={<Building className="h-5 w-5" />}
+        isLoading={isLoading === "agencies"}
+      />
+
+      <ResultCard
+        title="Users Import Test"
+        result={usersResult}
+        icon={<Users className="h-5 w-5" />}
+        isLoading={isLoading === "users"}
+      />
+
+      {/* Booking Test */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Plane className="h-5 w-5" />
+            Test Booking Import
+            {isLoading === "booking" && <Loader2 className="h-4 w-4 animate-spin" />}
+            {bookingResult && (
+              <Badge variant={bookingResult.success ? "default" : "destructive"}>
+                {bookingResult.success ? "Success" : "Failed"}
+              </Badge>
+            )}
+          </CardTitle>
+          <p className="text-sm text-gray-600">Test het importeren van een specifieke booking</p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2 mb-4">
+            <Input
+              placeholder="Booking ID (bijv. 29966990)"
+              value={bookingId}
+              onChange={(e) => setBookingId(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={testBooking} disabled={isLoading !== null || !bookingId.trim()}>
+              Test Import
+            </Button>
+          </div>
+
+          {bookingResult && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-2">
+                {bookingResult.success ? (
+                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                )}
+                <div className="flex-1">
+                  <p className={bookingResult.success ? "text-green-700" : "text-red-700"}>{bookingResult.message}</p>
+                  {bookingResult.error && (
+                    <p className="text-red-600 text-sm mt-1 font-mono bg-red-50 p-2 rounded">{bookingResult.error}</p>
+                  )}
+                </div>
+              </div>
+
+              {bookingResult.data?.booking && (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-2">Booking Found:</h4>
+                  <div className="bg-white p-3 rounded border">
+                    <div className="font-medium">Booking {bookingResult.data.booking.id}</div>
+                    <div className="text-sm text-gray-600">
+                      Client: {bookingResult.data.booking.clientName || bookingResult.data.booking.clientEmail}
+                    </div>
+                    <div className="text-sm text-gray-600">Status: {bookingResult.data.booking.status}</div>
+                    {bookingResult.data.booking.totalPrice && (
+                      <div className="text-sm text-gray-600">Price: €{bookingResult.data.booking.totalPrice}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Success Summary */}
+      {allTestsSuccessful && (
+        <Card className="bg-green-50 border-green-200">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+              <div>
+                <h3 className="text-lg font-semibold text-green-800">Newreisplan Microsite Ready! 🎉</h3>
+                <p className="text-green-700">Alle tests zijn succesvol - je kunt nu importeren</p>
+              </div>
+            </div>
+
+            {(agenciesResult?.data?.summary || usersResult?.data?.summary) && (
+              <div className="mt-4 grid grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {agenciesResult?.data?.summary?.totalAgencies || agenciesResult?.data?.agencies?.length || 0}
+                  </div>
+                  <div className="text-sm text-green-700">Agencies</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {usersResult?.data?.summary?.totalUsers || usersResult?.data?.users?.length || 0}
+                  </div>
+                  <div className="text-sm text-green-700">Users</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">{usersResult?.data?.summary?.totalItems || 0}</div>
+                  <div className="text-sm text-green-700">Total Items</div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Info Card */}
+      <Card className="bg-blue-50 border-blue-200 mt-6">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-3">
+            <Info className="h-6 w-6 text-blue-600 mt-0.5" />
+            <div>
+              <h4 className="font-semibold text-blue-800 mb-2">Test Info</h4>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• Authentication test controleert of je credentials kloppen</li>
+                <li>• Agencies test haalt alle agencies op (met paginering)</li>
+                <li>• Users test haalt alle users op van alle agencies</li>
+                <li>• Booking test probeert verschillende ID formaten en endpoints</li>
+                <li>• Alle tests loggen gedetailleerde info naar de browser console</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -1,64 +1,80 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     console.log("🔐 Testing Newreisplan authentication...")
 
-    const credentials = {
-      username: process.env.TRAVEL_COMPOSITOR_USERNAME!,
-      password: process.env.TRAVEL_COMPOSITOR_PASSWORD!,
-      micrositeId: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID!,
+    const username = process.env.TRAVEL_COMPOSITOR_USERNAME
+    const password = process.env.TRAVEL_COMPOSITOR_PASSWORD
+    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+
+    if (!username || !password || !micrositeId) {
+      return NextResponse.json({
+        success: false,
+        message: "Missing credentials in environment variables",
+        error: "TRAVEL_COMPOSITOR_USERNAME, TRAVEL_COMPOSITOR_PASSWORD, or TRAVEL_COMPOSITOR_MICROSITE_ID not found",
+      })
     }
 
-    console.log(`🌐 Authenticating with microsite: ${credentials.micrositeId}`)
+    console.log("📋 Using credentials:", {
+      username: username.substring(0, 3) + "***",
+      micrositeId,
+      hasPassword: !!password,
+    })
 
-    const authResponse = await fetch("https://online.travelcompositor.com/resources/authentication/authenticate", {
-      method: "POST",
+    // Test authentication with a simple endpoint
+    const authString = Buffer.from(`${username}:${password}`).toString("base64")
+
+    const testUrl = `https://api.travelcompositor.com/api/v1/agency/${micrositeId}`
+    console.log("🌐 Testing URL:", testUrl)
+
+    const response = await fetch(testUrl, {
+      method: "GET",
       headers: {
+        Authorization: `Basic ${authString}`,
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify(credentials),
     })
 
-    if (!authResponse.ok) {
-      const errorText = await authResponse.text()
-      console.error("❌ Authentication failed:", authResponse.status, errorText)
+    console.log("📡 Response status:", response.status)
+    console.log("📡 Response headers:", Object.fromEntries(response.headers.entries()))
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("❌ Auth failed:", errorText)
 
       return NextResponse.json({
         success: false,
-        error: `Authentication failed: ${authResponse.status}`,
-        debug: {
-          status: authResponse.status,
-          errorText: errorText.substring(0, 200),
-          credentials: {
-            username: credentials.username,
-            micrositeId: credentials.micrositeId,
-            passwordLength: credentials.password.length,
-          },
+        message: `Authentication failed (${response.status})`,
+        error: errorText || `HTTP ${response.status}`,
+        data: {
+          status: response.status,
+          statusText: response.statusText,
+          url: testUrl,
         },
       })
     }
 
-    const authData = await authResponse.json()
-    console.log("✅ Authentication successful")
+    const data = await response.json()
+    console.log("✅ Auth successful, response:", data)
 
     return NextResponse.json({
       success: true,
+      message: "Authentication successful",
       data: {
-        authenticated: true,
-        token: authData.token ? "Token received" : "No token",
-        micrositeId: credentials.micrositeId,
+        micrositeId,
+        responseData: data,
+        status: response.status,
       },
     })
   } catch (error) {
-    console.error("❌ Authentication test error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred",
-      },
-      { status: 500 },
-    )
+    console.error("💥 Auth test error:", error)
+
+    return NextResponse.json({
+      success: false,
+      message: "Network or server error during authentication",
+      error: error instanceof Error ? error.message : "Unknown error",
+    })
   }
 }

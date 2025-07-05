@@ -1,22 +1,23 @@
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto bg-blue-200 rounded-full animate-pulse"></div>
-          <h1 className="text-4xl font-bold text-gray-900">Loading Newreisplan Test...</h1>
-          <p className="text-xl text-gray-600">Preparing connection tests</p>
+    <div className="container mx-auto p-6 max-w-4xl">
+      <div className="animate-pulse space-y-6">
+        <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+
+        <div className="flex gap-4">
+          <div className="h-10 bg-gray-200 rounded w-32"></div>
+          <div className="h-10 bg-gray-200 rounded w-32"></div>
+          <div className="h-10 bg-gray-200 rounded w-32"></div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-xl p-6 shadow-sm">
-              <div className="w-full h-4 bg-gray-200 rounded animate-pulse mb-4"></div>
-              <div className="w-3/4 h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
-              <div className="w-1/2 h-4 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-          ))}
-        </div>
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="border rounded-lg p-6 space-y-4">
+            <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="h-20 bg-gray-200 rounded"></div>
+          </div>
+        ))}
       </div>
     </div>
   )

@@ -1,125 +1,143 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     console.log("🏢 Testing Newreisplan agencies import...")
 
-    // Authenticeer eerst
-    const credentials = {
-      username: process.env.TRAVEL_COMPOSITOR_USERNAME!,
-      password: process.env.TRAVEL_COMPOSITOR_PASSWORD!,
-      micrositeId: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID!,
+    const username = process.env.TRAVEL_COMPOSITOR_USERNAME
+    const password = process.env.TRAVEL_COMPOSITOR_PASSWORD
+    const micrositeId = process.env.TRAVEL_COMPOSITOR_MICROSITE_ID
+
+    if (!username || !password || !micrositeId) {
+      return NextResponse.json({
+        success: false,
+        message: "Missing credentials",
+        error: "Environment variables not configured",
+      })
     }
 
-    const authResponse = await fetch("https://online.travelcompositor.com/resources/authentication/authenticate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(credentials),
-    })
-
-    if (!authResponse.ok) {
-      throw new Error(`Authentication failed: ${authResponse.status}`)
-    }
-
-    const authData = await authResponse.json()
-    const token = authData.token
-
-    // Haal ALLE agencies op - probeer verschillende limits
-    console.log(`📋 Fetching ALL agencies from microsite ${credentials.micrositeId}...`)
-
+    const authString = Buffer.from(`${username}:${password}`).toString("base64")
     const allAgencies: any[] = []
-    let currentPage = 0
-    const pageSize = 100 // Grotere page size
+    let page = 1
+    const pageSize = 100
+    let hasMore = true
 
-    while (true) {
-      const agenciesResponse = await fetch(
-        `https://online.travelcompositor.com/resources/agency/${credentials.micrositeId}?first=${currentPage * pageSize}&limit=${pageSize}`,
-        {
-          headers: {
-            "auth-token": token,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
+    console.log("📄 Starting paginated agency fetch...")
+
+    while (hasMore && page <= 10) {
+      // Safety limit
+      const url = `https://api.travelcompositor.com/api/v1/agency/${micrositeId}?page=${page}&pageSize=${pageSize}`
+      console.log(`📄 Fetching page ${page}:`, url)
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Basic ${authString}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-      )
+      })
 
-      if (!agenciesResponse.ok) {
-        const errorText = await agenciesResponse.text()
-        console.error("❌ Agencies fetch failed:", agenciesResponse.status, errorText)
-
-        return NextResponse.json({
-          success: false,
-          error: `Agencies fetch failed: ${agenciesResponse.status}`,
-          debug: {
-            status: agenciesResponse.status,
-            errorText: errorText.substring(0, 200),
-            page: currentPage,
-          },
-        })
-      }
-
-      const agenciesData = await agenciesResponse.json()
-      console.log(`📊 Page ${currentPage} agencies response:`, agenciesData)
-
-      const pageAgencies = agenciesData.agency || agenciesData.agencies || []
-
-      if (pageAgencies.length === 0) {
-        console.log(`📄 No more agencies found on page ${currentPage}`)
+      if (!response.ok) {
+        console.error(`❌ Page ${page} failed:`, response.status)
         break
       }
 
-      allAgencies.push(...pageAgencies)
-      console.log(`📋 Added ${pageAgencies.length} agencies from page ${currentPage}, total: ${allAgencies.length}`)
+      const data = await response.json()
+      console.log(`📄 Page ${page} response:`, {
+        type: typeof data,
+        isArray: Array.isArray(data),
+        length: Array.isArray(data) ? data.length : "not array",
+        keys: typeof data === "object" ? Object.keys(data) : "not object",
+      })
 
-      // Als we minder dan pageSize krijgen, zijn we klaar
-      if (pageAgencies.length < pageSize) {
-        break
+      if (Array.isArray(data)) {
+        allAgencies.push(...data)
+        hasMore = data.length === pageSize
+        console.log(`✅ Page ${page}: ${data.length} agencies, total: ${allAgencies.length}`)
+      } else if (data && typeof data === "object") {
+        // Handle different response formats
+        if (data.agencies && Array.isArray(data.agencies)) {
+          allAgencies.push(...data.agencies)
+          hasMore = data.agencies.length === pageSize
+        } else if (data.data && Array.isArray(data.data)) {
+          allAgencies.push(...data.data)
+          hasMore = data.data.length === pageSize
+        } else {
+          console.log("🔍 Unexpected response format, treating as single agency")
+          allAgencies.push(data)
+          hasMore = false
+        }
+      } else {
+        console.log("❌ Unexpected response type")
+        hasMore = false
       }
 
-      currentPage++
+      page++
 
-      // Safety break na 10 pagina's
-      if (currentPage >= 10) {
-        console.log("⚠️ Breaking after 10 pages to prevent infinite loop")
-        break
-      }
+      // Small delay between requests
+      await new Promise((resolve) => setTimeout(resolve, 100))
     }
 
-    // Verrijk agencies met extra info
-    const enrichedAgencies = allAgencies.map((agency) => ({
-      id: agency.id,
-      name: agency.name || `Agency ${agency.id}`,
-      email: agency.email || agency.contactEmail || "",
-      phone: agency.phone || agency.contactPhone || "",
-      address: agency.address || "",
-      city: agency.city || "",
-      country: agency.country || "",
-      status: agency.status || "active",
-      createdDate: agency.createdDate || "",
-    }))
+    console.log(`🎉 Total agencies found: ${allAgencies.length}`)
 
-    console.log(`✅ Found ${enrichedAgencies.length} total agencies in Newreisplan`)
+    // Try alternative endpoints if we got no results
+    if (allAgencies.length === 0) {
+      console.log("🔄 Trying alternative endpoints...")
+
+      const alternativeUrls = [
+        `https://api.travelcompositor.com/api/v1/agencies/${micrositeId}`,
+        `https://api.travelcompositor.com/api/v1/microsite/${micrositeId}/agencies`,
+        `https://api.travelcompositor.com/api/v1/agency?micrositeId=${micrositeId}`,
+      ]
+
+      for (const altUrl of alternativeUrls) {
+        console.log("🔄 Trying:", altUrl)
+        try {
+          const response = await fetch(altUrl, {
+            method: "GET",
+            headers: {
+              Authorization: `Basic ${authString}`,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            console.log("✅ Alternative endpoint worked:", altUrl)
+
+            if (Array.isArray(data)) {
+              allAgencies.push(...data)
+            } else if (data && typeof data === "object" && data.agencies) {
+              allAgencies.push(...data.agencies)
+            }
+            break
+          }
+        } catch (error) {
+          console.log("❌ Alternative endpoint failed:", altUrl, error)
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
+      message: `Found ${allAgencies.length} agencies`,
       data: {
-        agencies: enrichedAgencies,
-        totalAgencies: enrichedAgencies.length,
-        pagesProcessed: currentPage + 1,
-        micrositeId: credentials.micrositeId,
+        agencies: allAgencies,
+        summary: {
+          totalAgencies: allAgencies.length,
+          pagesChecked: page - 1,
+        },
       },
     })
   } catch (error) {
-    console.error("❌ Agencies test error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred",
-      },
-      { status: 500 },
-    )
+    console.error("💥 Agencies test error:", error)
+
+    return NextResponse.json({
+      success: false,
+      message: "Error fetching agencies",
+      error: error instanceof Error ? error.message : "Unknown error",
+    })
   }
 }

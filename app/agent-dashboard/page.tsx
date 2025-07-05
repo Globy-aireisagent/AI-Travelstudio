@@ -2,18 +2,26 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   FileText,
   Bot,
+  Upload,
+  CreditCard,
   Users,
   Plus,
+  Sparkles,
+  ArrowRight,
   Settings,
+  Vote,
   Clock,
   CheckCircle,
+  AlertCircle,
+  Lightbulb,
+  Plane,
   Eye,
   Download,
   Search,
@@ -23,52 +31,21 @@ import {
   Share,
   Trash2,
   ExternalLink,
-  Edit,
-  Save,
-  Globe,
+  ChevronRight,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
-interface Project {
-  id: string
-  clientName: string
-  bookingReference: string
-  importMethod: string
-  hasWorksheet: boolean
-  onTemplate: boolean
-  destination: string
-  status: "active" | "completed" | "paused" | "draft"
-  lastModified: string
-  worksheetUrl?: string
-  templateUrl?: string
-  createdAt: string
-  totalValue?: number
-  pax?: number
-}
-
-interface TravelBuddy {
-  id: string
-  name: string
-  client: string
-  bookingId?: string
-  status: "active" | "draft" | "published"
-  conversations: number
-  lastUsed: string
-  type: "booking-specific" | "general" | "destination-specific"
-  description: string
-  chatUrl?: string
-  isPublished: boolean
-  publishedUrl?: string
-  configuration?: any
-}
-
 export default function AgentDashboard() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [travelBuddies, setTravelBuddies] = useState<TravelBuddy[]>([])
+  const [userBookings, setUserBookings] = useState([])
+  const [userIdeas, setUserIdeas] = useState([])
+  const [clients, setClients] = useState([])
+  const [myProjects, setMyProjects] = useState([])
+  const [travelBuddies, setTravelBuddies] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [filterStatus, setFilterStatus] = useState("all")
   const [projectFilter, setProjectFilter] = useState("all")
 
   useEffect(() => {
@@ -78,9 +55,40 @@ export default function AgentDashboard() {
   const loadDashboardData = async () => {
     setIsLoading(true)
     try {
-      // Load projects from localStorage and API
-      await loadProjects()
-      await loadTravelBuddies()
+      // Load user bookings (from imported TC data)
+      const bookingsResponse = await fetch("/api/user-bookings")
+      if (bookingsResponse.ok) {
+        const bookingsData = await bookingsResponse.json()
+        setUserBookings(bookingsData.bookings || [])
+      }
+
+      // Load user travel ideas
+      const ideasResponse = await fetch("/api/user-ideas")
+      if (ideasResponse.ok) {
+        const ideasData = await ideasResponse.json()
+        setUserIdeas(ideasData.ideas || [])
+      }
+
+      // Load clients
+      const clientsResponse = await fetch("/api/user-clients")
+      if (clientsResponse.ok) {
+        const clientsData = await clientsResponse.json()
+        setClients(clientsData.clients || [])
+      }
+
+      // Load my projects (AI Travel Studio work)
+      const projectsResponse = await fetch("/api/my-projects")
+      if (projectsResponse.ok) {
+        const projectsData = await projectsResponse.json()
+        setMyProjects(projectsData.projects || [])
+      }
+
+      // Load travel buddies
+      const buddiesResponse = await fetch("/api/travel-buddies")
+      if (buddiesResponse.ok) {
+        const buddiesData = await buddiesResponse.json()
+        setTravelBuddies(buddiesData.buddies || [])
+      }
     } catch (error) {
       console.error("Failed to load dashboard data:", error)
     } finally {
@@ -88,183 +96,214 @@ export default function AgentDashboard() {
     }
   }
 
-  const loadProjects = async () => {
-    // Load from localStorage (for imported travel ideas and bookings)
-    const savedProjects: Project[] = []
+  const aiTools = [
+    {
+      icon: <FileText className="h-8 w-8" />,
+      title: "Travel Content Generator",
+      description: "Genereer bestemmingsteksten, routes, dagplanningen en hotel aanbevelingen met AI",
+      href: "/travel-generator",
+      color: "from-blue-500 to-purple-600",
+      badge: "🤖 AI Powered",
+      features: ["Bestemmingsteksten", "Routebeschrijvingen", "Dagplanningen", "Hotel zoeker"],
+    },
+    {
+      icon: <Bot className="h-8 w-8" />,
+      title: "Travel Buddy Admin",
+      description: "Beheer AI chatbots voor je klanten en configureer intake formulieren",
+      href: "/travelbuddy",
+      color: "from-green-500 to-green-600",
+      badge: "💬 Chat AI",
+      features: ["AI Chatbot Setup", "Intake Formulieren", "Document Upload", "Chat Interface"],
+    },
+    {
+      icon: <Upload className="h-8 w-8" />,
+      title: "Travel Import & Generator",
+      description: "Importeer bookings en travel ideas uit Travel Compositor met alle content",
+      href: "/import",
+      color: "from-purple-500 to-pink-600",
+      badge: "📥 Import",
+      features: ["Booking Import", "Travel Ideas", "Content Extractie", "Foto's & Data"],
+    },
+  ]
 
-    // Check for imported travel ideas
-    const importedIdea = localStorage.getItem("importedTravelIdea")
-    if (importedIdea && importedIdea !== "undefined") {
-      try {
-        const ideaData = JSON.parse(importedIdea)
-        savedProjects.push({
-          id: `idea-${ideaData.id}`,
-          clientName: ideaData.customer?.name || "Onbekende klant",
-          bookingReference: ideaData.originalIdeaId || ideaData.id,
-          importMethod: "Travel Compositor Import",
-          hasWorksheet: true, // We have the travelwerkblad page
-          onTemplate: false,
-          destination: ideaData.destinations?.[0]?.name || "Onbekend",
-          status: "active",
-          lastModified: new Date().toISOString().split("T")[0],
-          worksheetUrl: "/travelwerkblad",
-          createdAt: ideaData.creationDate || new Date().toISOString(),
-          totalValue: ideaData.totalPrice?.amount || 0,
-          pax: ideaData.counters?.adults + ideaData.counters?.children || 2,
-        })
-      } catch (error) {
-        console.error("Error parsing imported travel idea:", error)
-      }
+  const extraTools = [
+    {
+      icon: <CreditCard className="h-8 w-8" />,
+      title: "Voucher Generator",
+      description: "Genereer professionele vouchers en reisdocumenten voor je klanten",
+      href: "/vouchers",
+      color: "from-orange-500 to-red-600",
+      badge: "🎫 Generator",
+      features: ["PDF Vouchers", "Email Templates", "Branding", "Multi-taal"],
+    },
+    {
+      icon: <Settings className="h-8 w-8" />,
+      title: "Websites Admin",
+      description: "Beheer je websites, domeinen en online aanwezigheid",
+      href: "/websites",
+      color: "from-gray-600 to-gray-700",
+      badge: "🌐 Admin",
+      features: ["Domain Management", "Website Builder", "SEO Tools", "Analytics"],
+    },
+  ]
+
+  // Demo data for projects - simplified for table view
+  const demoProjects = [
+    {
+      id: 1,
+      clientName: "Familie Jansen",
+      bookingReference: "TC-2025-001",
+      importMethod: "Travel Compositor Import",
+      hasWorksheet: true,
+      onTemplate: false,
+      destination: "Zuid-Korea",
+      status: "active",
+      lastModified: "2025-01-05",
+    },
+    {
+      id: 2,
+      clientName: "Nieuwe klant",
+      bookingReference: "AI-2025-002",
+      importMethod: "AI Content Generator",
+      hasWorksheet: true,
+      onTemplate: true,
+      destination: "Japan",
+      status: "completed",
+      lastModified: "2025-01-04",
+    },
+    {
+      id: 3,
+      clientName: "Familie Peters",
+      bookingReference: "TC-2025-003",
+      importMethod: "PDF Upload",
+      hasWorksheet: false,
+      onTemplate: false,
+      destination: "Middellandse Zee",
+      status: "draft",
+      lastModified: "2025-01-03",
+    },
+    {
+      id: 4,
+      clientName: "Meneer de Vries",
+      bookingReference: "TC-2025-002",
+      importMethod: "Travel Compositor Import",
+      hasWorksheet: true,
+      onTemplate: false,
+      destination: "Parijs",
+      status: "paused",
+      lastModified: "2025-01-02",
+    },
+  ]
+
+  const demoTravelBuddies = [
+    {
+      id: 1,
+      name: "Zuid-Korea Expert",
+      client: "Familie Jansen",
+      bookingId: "TC-2025-001",
+      status: "active",
+      conversations: 23,
+      lastUsed: "2025-01-05",
+      type: "booking-specific",
+      description: "AI assistent voor Zuid-Korea reis",
+    },
+    {
+      id: 2,
+      name: "Algemene Reis Assistent",
+      client: "Alle klanten",
+      bookingId: null,
+      status: "active",
+      conversations: 156,
+      lastUsed: "2025-01-05",
+      type: "general",
+      description: "Algemene reisadvies chatbot",
+    },
+    {
+      id: 3,
+      name: "Japan Specialist",
+      client: "Diverse klanten",
+      bookingId: null,
+      status: "draft",
+      conversations: 0,
+      lastUsed: "Nooit",
+      type: "destination-specific",
+      description: "Specialist voor Japan reizen",
+    },
+  ]
+
+  // Roadmap data
+  const roadmapFeatures = [
+    {
+      id: 1,
+      title: "AI Video Generator",
+      description: "Automatisch reisvideos genereren uit foto's en tekst",
+      status: "in-development",
+      votes: 47,
+      priority: "high",
+      eta: "Q2 2025",
+    },
+    {
+      id: 2,
+      title: "Multi-language Support",
+      description: "Volledige ondersteuning voor 15+ talen",
+      status: "completed",
+      votes: 32,
+      priority: "medium",
+      eta: "Completed",
+    },
+    {
+      id: 3,
+      title: "Mobile App",
+      description: "Native iOS en Android app voor agents",
+      status: "pipeline",
+      votes: 89,
+      priority: "high",
+      eta: "Q3 2025",
+    },
+    {
+      id: 4,
+      title: "Advanced Analytics",
+      description: "Uitgebreide rapportage en business intelligence",
+      status: "in-development",
+      votes: 23,
+      priority: "medium",
+      eta: "Q2 2025",
+    },
+    {
+      id: 5,
+      title: "API Marketplace",
+      description: "Marketplace voor third-party integraties",
+      status: "pipeline",
+      votes: 15,
+      priority: "low",
+      eta: "Q4 2025",
+    },
+  ]
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-green-100 text-green-700"
+      case "in-development":
+        return "bg-blue-100 text-blue-700"
+      case "pipeline":
+        return "bg-yellow-100 text-yellow-700"
+      default:
+        return "bg-gray-100 text-gray-700"
     }
-
-    // Check for other saved projects
-    const savedProjectsData = localStorage.getItem("agentProjects")
-    if (savedProjectsData) {
-      try {
-        const parsedProjects = JSON.parse(savedProjectsData)
-        savedProjects.push(...parsedProjects)
-      } catch (error) {
-        console.error("Error parsing saved projects:", error)
-      }
-    }
-
-    // Add some demo projects if no real data
-    if (savedProjects.length === 0) {
-      savedProjects.push(
-        {
-          id: "demo-1",
-          clientName: "Familie Jansen",
-          bookingReference: "TC-2025-001",
-          importMethod: "Travel Compositor Import",
-          hasWorksheet: true,
-          onTemplate: false,
-          destination: "Zuid-Korea",
-          status: "active",
-          lastModified: "2025-01-05",
-          worksheetUrl: "/travelwerkblad",
-          createdAt: "2025-01-01",
-          totalValue: 3450,
-          pax: 2,
-        },
-        {
-          id: "demo-2",
-          clientName: "Nieuwe klant",
-          bookingReference: "AI-2025-002",
-          importMethod: "AI Content Generator",
-          hasWorksheet: true,
-          onTemplate: true,
-          destination: "Japan",
-          status: "completed",
-          lastModified: "2025-01-04",
-          templateUrl: "/roadbook/ai-2025-002",
-          createdAt: "2025-01-02",
-          totalValue: 2800,
-          pax: 2,
-        },
-      )
-    }
-
-    setProjects(savedProjects)
   }
 
-  const loadTravelBuddies = async () => {
-    // Load from localStorage
-    const savedBuddies: TravelBuddy[] = []
-
-    // Check for saved travel buddies
-    const savedBuddiesData = localStorage.getItem("travelBuddies")
-    if (savedBuddiesData) {
-      try {
-        const parsedBuddies = JSON.parse(savedBuddiesData)
-        savedBuddies.push(...parsedBuddies)
-      } catch (error) {
-        console.error("Error parsing saved travel buddies:", error)
-      }
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <CheckCircle className="h-4 w-4" />
+      case "in-development":
+        return <Clock className="h-4 w-4" />
+      case "pipeline":
+        return <AlertCircle className="h-4 w-4" />
+      default:
+        return <Lightbulb className="h-4 w-4" />
     }
-
-    // Add demo buddies if no real data
-    if (savedBuddies.length === 0) {
-      savedBuddies.push(
-        {
-          id: "buddy-1",
-          name: "Zuid-Korea Expert",
-          client: "Familie Jansen",
-          bookingId: "TC-2025-001",
-          status: "active",
-          conversations: 23,
-          lastUsed: "2025-01-05",
-          type: "booking-specific",
-          description: "AI assistent voor Zuid-Korea reis",
-          chatUrl: "/travelbuddy/TC-2025-001",
-          isPublished: true,
-          publishedUrl: "https://travelbuddy.app/TC-2025-001",
-        },
-        {
-          id: "buddy-2",
-          name: "Algemene Reis Assistent",
-          client: "Alle klanten",
-          status: "active",
-          conversations: 156,
-          lastUsed: "2025-01-05",
-          type: "general",
-          description: "Algemene reisadvies chatbot",
-          chatUrl: "/travelbuddy",
-          isPublished: true,
-          publishedUrl: "https://travelbuddy.app/general",
-        },
-        {
-          id: "buddy-3",
-          name: "Japan Specialist",
-          client: "Diverse klanten",
-          status: "draft",
-          conversations: 0,
-          lastUsed: "Nooit",
-          type: "destination-specific",
-          description: "Specialist voor Japan reizen",
-          isPublished: false,
-        },
-      )
-    }
-
-    setTravelBuddies(savedBuddies)
-  }
-
-  const saveProject = (project: Project) => {
-    const updatedProjects = projects.map((p) => (p.id === project.id ? project : p))
-    setProjects(updatedProjects)
-
-    // Save to localStorage
-    const projectsToSave = updatedProjects.filter((p) => !p.id.startsWith("demo-"))
-    localStorage.setItem("agentProjects", JSON.stringify(projectsToSave))
-  }
-
-  const saveTravelBuddy = (buddy: TravelBuddy) => {
-    const updatedBuddies = travelBuddies.map((b) => (b.id === buddy.id ? buddy : b))
-    setTravelBuddies(updatedBuddies)
-
-    // Save to localStorage
-    const buddiesToSave = updatedBuddies.filter((b) => !b.id.startsWith("buddy-"))
-    localStorage.setItem("travelBuddies", JSON.stringify(buddiesToSave))
-  }
-
-  const publishTravelBuddy = async (buddyId: string) => {
-    const buddy = travelBuddies.find((b) => b.id === buddyId)
-    if (!buddy) return
-
-    // Generate published URL
-    const publishedUrl = `https://travelbuddy.app/${buddy.type === "general" ? "general" : buddy.bookingId || buddy.id}`
-
-    const updatedBuddy = {
-      ...buddy,
-      status: "active" as const,
-      isPublished: true,
-      publishedUrl,
-    }
-
-    saveTravelBuddy(updatedBuddy)
-
-    // Show success message
-    alert(`Travel Buddy gepubliceerd! URL: ${publishedUrl}`)
   }
 
   const getProjectStatusColor = (status: string) => {
@@ -282,20 +321,7 @@ export default function AgentDashboard() {
     }
   }
 
-  const getBuddyStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "active":
-        return "bg-green-100 text-green-700"
-      case "published":
-        return "bg-blue-100 text-blue-700"
-      case "draft":
-        return "bg-gray-100 text-gray-700"
-      default:
-        return "bg-gray-100 text-gray-700"
-    }
-  }
-
-  const filteredProjects = projects.filter((project: Project) => {
+  const filteredProjects = demoProjects.filter((project: any) => {
     const matchesSearch =
       project.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.bookingReference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -304,23 +330,12 @@ export default function AgentDashboard() {
     return matchesSearch && matchesFilter
   })
 
-  const filteredBuddies = travelBuddies.filter((buddy: TravelBuddy) => {
+  const filteredBuddies = demoTravelBuddies.filter((buddy: any) => {
     return (
       buddy.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       buddy.client?.toLowerCase().includes(searchTerm.toLowerCase())
     )
   })
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Dashboard laden...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -341,14 +356,13 @@ export default function AgentDashboard() {
             </div>
             <div className="flex items-center space-x-4">
               <Badge className="bg-green-100 text-green-700 px-3 py-1 rounded-full">Professional Plan</Badge>
-              <Link href="/">
-                <Button
-                  variant="outline"
-                  className="rounded-xl shadow-sm hover:shadow-md transition-all bg-transparent"
-                >
-                  🏠 Home
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                className="rounded-xl shadow-sm hover:shadow-md transition-all bg-transparent"
+                onClick={() => (window.location.href = "/")}
+              >
+                🏠 Home
+              </Button>
             </div>
           </div>
         </div>
@@ -360,6 +374,69 @@ export default function AgentDashboard() {
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-gray-800 mb-2">🎯 Mijn Werk & Projecten</h2>
             <p className="text-gray-600 text-lg">Overzicht van al je actieve projecten en AI assistenten</p>
+          </div>
+
+          {/* Beautiful Stats Cards Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-100 text-sm font-medium">Mijn Bookings</p>
+                    <p className="text-3xl font-bold">{userBookings.length || 3}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Plane className="h-8 w-8 text-blue-200" />
+                    <ChevronRight className="h-5 w-5 text-blue-200" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-purple-100 text-sm font-medium">Travel Ideas</p>
+                    <p className="text-3xl font-bold">{userIdeas.length || 4}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-8 w-8 text-purple-200" />
+                    <ChevronRight className="h-5 w-5 text-purple-200" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-100 text-sm font-medium">Mijn Projecten</p>
+                    <p className="text-3xl font-bold">{demoProjects.length}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-8 w-8 text-green-200" />
+                    <ChevronRight className="h-5 w-5 text-green-200" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-pink-500 to-pink-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-pink-100 text-sm font-medium">Travel Buddies</p>
+                    <p className="text-3xl font-bold">{demoTravelBuddies.length}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-8 w-8 text-pink-200" />
+                    <ChevronRight className="h-5 w-5 text-pink-200" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Search and Filter */}
@@ -390,24 +467,24 @@ export default function AgentDashboard() {
           {/* Beautiful Enhanced Tabs */}
           <Tabs defaultValue="projects" className="space-y-6">
             <div className="flex items-center justify-center">
-              <TabsList className="grid w-full max-w-md grid-cols-2 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg rounded-2xl p-2">
+              <TabsList className="grid w-full max-w-md grid-cols-2 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg rounded-2xl p-1">
                 <TabsTrigger
                   value="projects"
-                  className="flex items-center gap-3 rounded-xl py-3 px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
+                  className="flex items-center gap-2 rounded-xl py-2 px-4 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 text-sm font-medium"
                 >
-                  <FileText className="h-5 w-5" />
-                  <span className="font-medium">Mijn Projecten</span>
-                  <Badge className="bg-green-100 text-green-700 data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                  <FileText className="h-4 w-4" />
+                  <span>Mijn Projecten</span>
+                  <Badge className="bg-green-100 text-green-700 data-[state=active]:bg-white/20 data-[state=active]:text-white text-xs px-2 py-0.5">
                     {filteredProjects.length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger
                   value="buddies"
-                  className="flex items-center gap-3 rounded-xl py-3 px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-500 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
+                  className="flex items-center gap-2 rounded-xl py-2 px-4 data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-500 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 text-sm font-medium"
                 >
-                  <Bot className="h-5 w-5" />
-                  <span className="font-medium">Travel Buddies</span>
-                  <Badge className="bg-pink-100 text-pink-700 data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                  <Bot className="h-4 w-4" />
+                  <span>Travel Buddies</span>
+                  <Badge className="bg-pink-100 text-pink-700 data-[state=active]:bg-white/20 data-[state=active]:text-white text-xs px-2 py-0.5">
                     {filteredBuddies.length}
                   </Badge>
                 </TabsTrigger>
@@ -432,7 +509,7 @@ export default function AgentDashboard() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {filteredProjects.map((project: Project) => (
+                          {filteredProjects.map((project: any) => (
                             <tr
                               key={project.id}
                               className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200"
@@ -441,11 +518,6 @@ export default function AgentDashboard() {
                                 <div>
                                   <div className="font-semibold text-gray-900 text-lg">{project.clientName}</div>
                                   <div className="text-sm text-gray-500 mt-1">{project.destination}</div>
-                                  {project.totalValue && (
-                                    <div className="text-sm text-green-600 font-medium">
-                                      €{project.totalValue.toLocaleString()}
-                                    </div>
-                                  )}
                                 </div>
                               </td>
                               <td className="p-6">
@@ -492,29 +564,15 @@ export default function AgentDashboard() {
                               </td>
                               <td className="p-6">
                                 <div className="flex items-center gap-3 justify-center">
-                                  {project.worksheetUrl && (
-                                    <Link href={project.worksheetUrl}>
-                                      <Button
-                                        size="sm"
-                                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl"
-                                      >
-                                        <ExternalLink className="h-4 w-4 mr-2" />
-                                        Werkblad
-                                      </Button>
-                                    </Link>
-                                  )}
-                                  {project.templateUrl && (
-                                    <Link href={project.templateUrl}>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="hover:bg-purple-50 hover:border-purple-200 bg-transparent rounded-xl"
-                                      >
-                                        <Globe className="h-4 w-4 mr-2" />
-                                        Live
-                                      </Button>
-                                    </Link>
-                                  )}
+                                  <Link href={`/werkblad?booking=${project.bookingReference}`}>
+                                    <Button
+                                      size="sm"
+                                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl"
+                                    >
+                                      <ExternalLink className="h-4 w-4 mr-2" />
+                                      Werkblad
+                                    </Button>
+                                  </Link>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="sm" className="hover:bg-gray-100 rounded-xl">
@@ -530,8 +588,12 @@ export default function AgentDashboard() {
                                         Bekijk Details
                                       </DropdownMenuItem>
                                       <DropdownMenuItem className="rounded-xl">
-                                        <Edit className="h-4 w-4 mr-2" />
-                                        Bewerken
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Roadbook
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="rounded-xl">
+                                        <Bot className="h-4 w-4 mr-2" />
+                                        Travel Buddy
                                       </DropdownMenuItem>
                                       <DropdownMenuItem className="rounded-xl">
                                         <Copy className="h-4 w-4 mr-2" />
@@ -589,7 +651,7 @@ export default function AgentDashboard() {
             <TabsContent value="buddies">
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
                 {filteredBuddies.length > 0 ? (
-                  filteredBuddies.map((buddy: TravelBuddy, index: number) => (
+                  filteredBuddies.map((buddy: any, index: number) => (
                     <Card
                       key={index}
                       className="hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border-0 bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl overflow-hidden"
@@ -601,10 +663,11 @@ export default function AgentDashboard() {
                               <div className="p-2 bg-gradient-to-r from-pink-500 to-pink-600 rounded-xl">
                                 <Bot className="h-5 w-5 text-white" />
                               </div>
-                              <Badge className={`${getBuddyStatusColor(buddy.status)} px-3 py-1 rounded-full`}>
-                                {buddy.status === "active" && "Actief"}
-                                {buddy.status === "published" && "Gepubliceerd"}
-                                {buddy.status === "draft" && "Concept"}
+                              <Badge
+                                variant={buddy.status === "active" ? "default" : "secondary"}
+                                className={`${buddy.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"} px-3 py-1 rounded-full`}
+                              >
+                                {buddy.status === "active" ? "Actief" : "Concept"}
                               </Badge>
                             </div>
                             <CardTitle className="text-xl mb-2 text-gray-800">{buddy.name}</CardTitle>
@@ -623,31 +686,14 @@ export default function AgentDashboard() {
                               align="end"
                               className="bg-white/95 backdrop-blur-sm border-gray-200 shadow-xl rounded-2xl"
                             >
-                              {buddy.chatUrl && (
-                                <DropdownMenuItem className="rounded-xl">
-                                  <Link href={buddy.chatUrl} className="flex items-center w-full">
-                                    <MessageCircle className="h-4 w-4 mr-2" />
-                                    Test Chat
-                                  </Link>
-                                </DropdownMenuItem>
-                              )}
+                              <DropdownMenuItem className="rounded-xl">
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                Test Chat
+                              </DropdownMenuItem>
                               <DropdownMenuItem className="rounded-xl">
                                 <Settings className="h-4 w-4 mr-2" />
                                 Configureren
                               </DropdownMenuItem>
-                              {buddy.publishedUrl && (
-                                <DropdownMenuItem className="rounded-xl">
-                                  <a
-                                    href={buddy.publishedUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center w-full"
-                                  >
-                                    <ExternalLink className="h-4 w-4 mr-2" />
-                                    Open Live URL
-                                  </a>
-                                </DropdownMenuItem>
-                              )}
                               <DropdownMenuItem className="rounded-xl">
                                 <Copy className="h-4 w-4 mr-2" />
                                 Dupliceren
@@ -663,17 +709,6 @@ export default function AgentDashboard() {
                       <CardContent className="p-6">
                         <div className="space-y-4">
                           <p className="text-gray-600 leading-relaxed">{buddy.description}</p>
-
-                          {buddy.publishedUrl && (
-                            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-                              <div className="flex items-center gap-2 text-sm text-green-700 mb-1">
-                                <Globe className="h-4 w-4" />
-                                <span className="font-medium">Live URL uitgedeeld</span>
-                              </div>
-                              <div className="text-xs text-green-600 font-mono break-all">{buddy.publishedUrl}</div>
-                            </div>
-                          )}
-
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div className="bg-gray-50 p-3 rounded-xl">
                               <span className="text-gray-500 block">Gesprekken</span>
@@ -684,52 +719,23 @@ export default function AgentDashboard() {
                               <span className="font-semibold text-sm text-gray-800">{buddy.lastUsed}</span>
                             </div>
                           </div>
-
                           <div className="pt-4 border-t border-gray-100">
                             <div className="flex gap-3">
-                              {buddy.chatUrl ? (
-                                <Link href={buddy.chatUrl} className="flex-1">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="w-full bg-white/80 backdrop-blur-sm border-gray-200 hover:shadow-lg transition-all duration-300 rounded-xl"
-                                  >
-                                    <MessageCircle className="h-4 w-4 mr-2" />
-                                    Chat
-                                  </Button>
-                                </Link>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1 bg-white/80 backdrop-blur-sm border-gray-200 hover:shadow-lg transition-all duration-300 rounded-xl"
-                                  disabled
-                                >
-                                  <MessageCircle className="h-4 w-4 mr-2" />
-                                  Chat
-                                </Button>
-                              )}
-
-                              {buddy.status === "draft" ? (
-                                <Button
-                                  size="sm"
-                                  className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl"
-                                  onClick={() => publishTravelBuddy(buddy.id)}
-                                >
-                                  <Save className="h-4 w-4 mr-2" />
-                                  Publiceer
-                                </Button>
-                              ) : (
-                                <Link href="/travelbuddy" className="flex-1">
-                                  <Button
-                                    size="sm"
-                                    className="w-full bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl"
-                                  >
-                                    <Settings className="h-4 w-4 mr-2" />
-                                    Setup
-                                  </Button>
-                                </Link>
-                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 bg-white/80 backdrop-blur-sm border-gray-200 hover:shadow-lg transition-all duration-300 rounded-xl"
+                              >
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                Chat
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="flex-1 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl"
+                              >
+                                <Settings className="h-4 w-4 mr-2" />
+                                Setup
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -756,6 +762,271 @@ export default function AgentDashboard() {
               </div>
             </TabsContent>
           </Tabs>
+        </section>
+
+        {/* AI Tools Section */}
+        <section className="mb-16">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">🤖 AI Tools voor Reisagenten</h2>
+              <p className="text-gray-600 text-lg">Krachtige AI-tools om je werk te versnellen</p>
+            </div>
+            <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-full shadow-lg">
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Powered
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {aiTools.map((tool, index) => (
+              <Card
+                key={index}
+                className="group hover:shadow-2xl transition-all duration-300 hover:-translate-y-3 border-0 bg-white rounded-3xl shadow-xl overflow-hidden"
+              >
+                <CardHeader className="p-8 pb-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div
+                      className={`p-4 rounded-2xl bg-gradient-to-r ${tool.color} text-white group-hover:scale-110 transition-transform duration-300 shadow-lg`}
+                    >
+                      {tool.icon}
+                    </div>
+                    <Badge className="bg-blue-100 text-blue-700 text-sm px-3 py-1 rounded-full shadow-sm">
+                      {tool.badge}
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-xl group-hover:text-blue-600 transition-colors mb-3">
+                    {tool.title}
+                  </CardTitle>
+                  <CardDescription className="text-gray-600 text-base leading-relaxed">
+                    {tool.description}
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="px-8 pb-8">
+                  <div className="mb-6">
+                    <h4 className="font-semibold text-gray-800 mb-3">Features:</h4>
+                    <ul className="space-y-2">
+                      {tool.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-center text-sm text-gray-600">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full mr-3"></div>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <Link href={tool.href}>
+                    <Button
+                      className={`w-full bg-gradient-to-r ${tool.color} hover:shadow-xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105 rounded-2xl py-6 text-lg font-semibold shadow-lg`}
+                    >
+                      Open Tool <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* Extra Tools Section */}
+        <section className="mb-16">
+          <div className="flex items-center mb-8">
+            <Sparkles className="h-8 w-8 text-purple-600 mr-3" />
+            <div>
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">Extra Tools</h2>
+              <p className="text-gray-600 text-lg">Aanvullende tools voor je reisbusiness</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {extraTools.map((tool, index) => (
+              <Card
+                key={index}
+                className="group hover:shadow-2xl transition-all duration-300 hover:-translate-y-3 border-0 bg-white rounded-3xl shadow-xl overflow-hidden"
+              >
+                <CardHeader className="p-8 pb-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div
+                      className={`p-4 rounded-2xl bg-gradient-to-r ${tool.color} text-white group-hover:scale-110 transition-transform duration-300 shadow-lg`}
+                    >
+                      {tool.icon}
+                    </div>
+                    <Badge className="bg-gray-100 text-gray-700 text-sm px-3 py-1 rounded-full shadow-sm">
+                      {tool.badge}
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-xl group-hover:text-blue-600 transition-colors mb-3">
+                    {tool.title}
+                  </CardTitle>
+                  <CardDescription className="text-gray-600 text-base leading-relaxed">
+                    {tool.description}
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="px-8 pb-8">
+                  <div className="mb-6">
+                    <h4 className="font-semibold text-gray-800 mb-3">Features:</h4>
+                    <ul className="space-y-2">
+                      {tool.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-center text-sm text-gray-600">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <Link href={tool.href}>
+                    <Button
+                      className={`w-full bg-gradient-to-r ${tool.color} hover:shadow-xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105 rounded-2xl py-6 text-lg font-semibold shadow-lg`}
+                    >
+                      Open Tool <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* Travel Management System */}
+        <section>
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-green-600 mr-3" />
+              <div>
+                <h2 className="text-3xl font-bold text-gray-800 mb-2">Travel Management System</h2>
+                <p className="text-gray-600 text-lg">
+                  Bekijk hier de stand van zaken hoe ver we zijn met de ontwikkeling van de AI-travelstudio. Heb je
+                  wensen, geef ze door en we zetten ze op het stembord. Stem zelf mee op ideeën van je collega's
+                </p>
+              </div>
+            </div>
+            <Link href="/feature-request">
+              <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105 rounded-2xl px-6 py-3 shadow-lg">
+                <Plus className="h-5 w-5 mr-2" />
+                Nieuw Verzoek
+              </Button>
+            </Link>
+          </div>
+
+          {/* Roadmap Overview */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <Card className="bg-white rounded-3xl shadow-xl border-0">
+              <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-3xl p-6">
+                <CardTitle className="flex items-center">
+                  <CheckCircle className="h-6 w-6 mr-2" />
+                  Afgerond
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="text-3xl font-bold text-green-600 mb-2">
+                  {roadmapFeatures.filter((f) => f.status === "completed").length}
+                </div>
+                <p className="text-gray-600">Features voltooid</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white rounded-3xl shadow-xl border-0">
+              <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-3xl p-6">
+                <CardTitle className="flex items-center">
+                  <Clock className="h-6 w-6 mr-2" />
+                  In Ontwikkeling
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="text-3xl font-bold text-blue-600 mb-2">
+                  {roadmapFeatures.filter((f) => f.status === "in-development").length}
+                </div>
+                <p className="text-gray-600">Features in uitvoering</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white rounded-3xl shadow-xl border-0">
+              <CardHeader className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-t-3xl p-6">
+                <CardTitle className="flex items-center">
+                  <AlertCircle className="h-6 w-6 mr-2" />
+                  Pipeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="text-3xl font-bold text-orange-600 mb-2">
+                  {roadmapFeatures.filter((f) => f.status === "pipeline").length}
+                </div>
+                <p className="text-gray-600">Features gepland</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Feature Roadmap */}
+          <Card className="bg-white rounded-3xl shadow-xl border-0">
+            <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-3xl p-6">
+              <CardTitle className="flex items-center">
+                <Lightbulb className="h-6 w-6 mr-2" />
+                Feature Roadmap & Verzoeken
+              </CardTitle>
+              <CardDescription className="text-purple-100">
+                Stem op features en dien nieuwe verzoeken in
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {roadmapFeatures.map((feature) => (
+                  <div
+                    key={feature.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        {getStatusIcon(feature.status)}
+                        <Badge className={getStatusColor(feature.status)}>
+                          {feature.status === "completed"
+                            ? "Afgerond"
+                            : feature.status === "in-development"
+                              ? "In Ontwikkeling"
+                              : "Pipeline"}
+                        </Badge>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">{feature.title}</h4>
+                        <p className="text-sm text-gray-600">{feature.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-gray-800">{feature.eta}</div>
+                        <div className="text-xs text-gray-500">ETA</div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center space-x-2 rounded-xl hover:shadow-md transition-all bg-transparent"
+                        disabled={feature.status === "completed"}
+                      >
+                        <Vote className="h-4 w-4" />
+                        <span>{feature.votes}</span>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-gray-800 mb-1">Mis je een feature?</h4>
+                    <p className="text-sm text-gray-600">Dien een nieuw verzoek in en laat anderen stemmen</p>
+                  </div>
+                  <Link href="/feature-request">
+                    <Button className="bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105 rounded-2xl px-6 py-3 shadow-lg">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nieuw Verzoek
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </section>
       </div>
     </div>
