@@ -1,11 +1,17 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useSession } from "next-auth/react"
 import { redirect } from "next/navigation"
 import { FaUsers } from "react-icons/fa"
 import { MdDashboard } from "react-icons/md"
 import { PiUserGear } from "react-icons/pi"
 import Link from "next/link"
+
+// Load the heavy dashboard purely on the client; skip SSR to avoid `useSession` issues
+const AgentDashboardClient = dynamic(() => import("@/components/agent-dashboard-client"), {
+  ssr: false,
+})
 
 const AgentDashboard = () => {
   const { status } = useSession()
@@ -57,4 +63,6 @@ const AgentDashboard = () => {
   )
 }
 
-export default AgentDashboard
+export default function AgentDashboardPage() {
+  return <AgentDashboardClient />
+}
