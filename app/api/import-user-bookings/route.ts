@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log("📋 Starting user bookings import...")
 
-    const { userId, userEmail, micrositeId, importAll = false } = await request.json()
+    const { userId, userEmail, micrositeId, limit = 50 } = await request.json()
 
     if (!userId || !userEmail) {
       return NextResponse.json({ error: "User ID and email required" }, { status: 400 })
@@ -19,72 +19,43 @@ export async function POST(request: NextRequest) {
     const { data: user, error: userError } = await supabase.from("users").select("*").eq("id", userId).single()
 
     if (userError || !user) {
-      throw new Error("User not found")
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
     console.log(`👤 Importing bookings for user: ${user.email}`)
 
     // 2. Haal bookings op uit Travel Compositor
-    const bookings = await fetchUserBookingsFromTC(user, importer)
+    const microsites = micrositeId ? [micrositeId] : [user.microsite_id]
+    let allBookings: any[] = []
 
-    console.log(`📋 Found ${bookings.length} bookings for ${user.email}`)
+    for (const msId of microsites) {
+      if (!msId) continue
 
-    // 3. Importeer bookings naar Supabase
+      try {
+        const bookings = await importer.getUserBookings(msId, userEmail)
+        allBookings.push(...bookings.map((b) => ({ ...b, microsite_id: msId })))
+        console.log(`📋 Found ${bookings.length} bookings in microsite ${msId}`)
+      } catch (error) {
+        console.log(`⚠️ Failed to get bookings from microsite ${msId}:`, error)
+        continue
+      }
+    }
+
+    // 3. Limiteer aantal bookings
+    if (allBookings.length > limit) {
+      allBookings = allBookings.slice(0, limit)
+      console.log(`⚠️ Limited to ${limit} bookings`)
+    }
+
+    // 4. Importeer bookings naar Supabase
     const importResults = []
 
-    for (const booking of bookings) {
+    for (const booking of allBookings) {
       try {
-        // Check of booking al bestaat
-        const { data: existingBooking } = await supabase
-          .from("imported_bookings")
-          .select("id")
-          .eq("tc_booking_id", booking.id)
-          .eq("tc_microsite_id", user.microsite_id)
-          .single()
-
-        if (existingBooking) {
-          console.log(`⏭️ Booking ${booking.id} already exists, skipping`)
-          continue
-        }
-
-        // Importeer booking
-        const bookingData = {
-          user_id: user.id,
-          tc_booking_id: booking.id,
-          tc_microsite_id: user.microsite_id,
-          booking_reference: booking.bookingReference || booking.id,
-          title: booking.title || `Booking ${booking.id}`,
-          destination: booking.destination,
-          start_date: booking.startDate,
-          end_date: booking.endDate,
-          status: booking.status || "confirmed",
-          total_price: booking.totalPrice?.amount || booking.totalPrice,
-          currency: booking.currency || "EUR",
-          client_name: booking.client?.name || booking.clientName,
-          client_email: booking.client?.email || booking.clientEmail,
-          client_phone: booking.client?.phone || booking.clientPhone,
-          full_data: booking,
-        }
-
-        const { error: insertError } = await supabase.from("imported_bookings").insert(bookingData)
-
-        if (insertError) {
-          console.error(`❌ Failed to import booking ${booking.id}:`, insertError)
-          importResults.push({
-            success: false,
-            bookingId: booking.id,
-            error: insertError.message,
-          })
-        } else {
-          console.log(`✅ Imported booking ${booking.id}`)
-          importResults.push({
-            success: true,
-            bookingId: booking.id,
-            title: bookingData.title,
-          })
-        }
+        const result = await importBookingToDatabase(booking, user, supabase)
+        importResults.push(result)
       } catch (error) {
-        console.error(`❌ Error importing booking ${booking.id}:`, error)
+        console.error(`❌ Failed to import booking ${booking.id}:`, error)
         importResults.push({
           success: false,
           bookingId: booking.id,
@@ -95,28 +66,17 @@ export async function POST(request: NextRequest) {
 
     const successful = importResults.filter((r) => r.success).length
 
-    // 4. Log de import actie
-    await supabase.from("audit_logs").insert({
-      user_id: user.id,
-      action: "bookings_import",
-      resource_type: "booking",
-      details: {
-        total_found: bookings.length,
-        imported: successful,
-        failed: importResults.length - successful,
-        microsite_id: user.microsite_id,
-      },
-    })
-
-    console.log(`✅ Booking import complete: ${successful}/${bookings.length} imported`)
+    console.log(`✅ Booking import complete: ${successful}/${allBookings.length} imported`)
 
     return NextResponse.json({
       success: true,
+      results: importResults,
       summary: {
-        total_found: bookings.length,
-        imported: successful,
-        failed: importResults.length - successful,
-        results: importResults,
+        total: allBookings.length,
+        successful,
+        failed: allBookings.length - successful,
+        userId,
+        userEmail,
       },
     })
   } catch (error) {
@@ -131,18 +91,86 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function fetchUserBookingsFromTC(user: any, importer: UniversalTravelImporter) {
+async function importBookingToDatabase(booking: any, user: any, supabase: any) {
   try {
-    console.log(`🔍 Fetching bookings for ${user.email} from microsite ${user.microsite_id}`)
+    // Check of booking al bestaat
+    const { data: existingBooking } = await supabase
+      .from("bookings")
+      .select("id")
+      .eq("tc_booking_id", booking.id || booking.bookingId)
+      .eq("microsite_id", booking.microsite_id)
+      .single()
 
-    // Gebruik de Travel Compositor client om bookings op te halen
-    const bookings = await importer.getUserBookings(user.microsite_id, user.email)
+    if (existingBooking) {
+      return {
+        success: false,
+        bookingId: booking.id,
+        error: "Booking already exists",
+      }
+    }
 
-    console.log(`📋 Found ${bookings.length} bookings for ${user.email}`)
+    // Importeer booking
+    const bookingData = {
+      user_id: user.id,
+      tc_booking_id: booking.id || booking.bookingId || booking.bookingReference,
+      booking_reference: booking.bookingReference || booking.reference,
+      microsite_id: booking.microsite_id,
+      title: booking.title || booking.name || `Booking ${booking.id}`,
+      destination: booking.destination || extractDestination(booking),
+      start_date: booking.startDate || booking.departureDate,
+      end_date: booking.endDate || booking.returnDate,
+      status: booking.status || "confirmed",
+      client_name: booking.client?.name || booking.clientName,
+      client_email: booking.client?.email || booking.clientEmail,
+      client_phone: booking.client?.phone || booking.clientPhone,
+      total_price: extractPrice(booking),
+      currency: booking.currency || "EUR",
+      accommodations: booking.accommodations || booking.hotels || [],
+      activities: booking.activities || booking.tickets || [],
+      transports: booking.transports || [],
+      vouchers: booking.vouchers || booking.transfers || [],
+      original_data: booking,
+    }
 
-    return bookings
+    const { error: insertError } = await supabase.from("bookings").insert(bookingData)
+
+    if (insertError) {
+      throw new Error(`Database insert failed: ${insertError.message}`)
+    }
+
+    return {
+      success: true,
+      bookingId: booking.id,
+    }
   } catch (error) {
-    console.error(`❌ Failed to fetch bookings for ${user.email}:`, error)
-    return []
+    return {
+      success: false,
+      bookingId: booking.id,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
   }
+}
+
+function extractDestination(booking: any): string {
+  if (booking.destination) return booking.destination
+  if (booking.destinations && booking.destinations.length > 0) {
+    return booking.destinations[0].name || booking.destinations[0]
+  }
+  if (booking.accommodations && booking.accommodations.length > 0) {
+    return booking.accommodations[0].destination || booking.accommodations[0].city
+  }
+  return "Unknown Destination"
+}
+
+function extractPrice(booking: any): number {
+  if (booking.totalPrice) {
+    if (typeof booking.totalPrice === "number") return booking.totalPrice
+    if (booking.totalPrice.amount) return booking.totalPrice.amount
+  }
+  if (booking.total_price) return booking.total_price
+  if (booking.price) {
+    if (typeof booking.price === "number") return booking.price
+    if (booking.price.amount) return booking.price.amount
+  }
+  return 0
 }

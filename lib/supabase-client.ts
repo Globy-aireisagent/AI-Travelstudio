@@ -4,22 +4,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// Client-side Supabase client (singleton pattern)
-let supabaseClient: ReturnType<typeof createClient> | null = null
+// Client-side Supabase client (voor frontend)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-export function getSupabaseClient() {
-  if (!supabaseClient) {
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    })
-  }
-  return supabaseClient
-}
-
-// Server-side Supabase client (service role)
+// Server-side Supabase client (voor API routes)
 export function getSupabaseServiceClient() {
   return createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
@@ -50,40 +38,50 @@ export interface User {
   last_login?: string
 }
 
-export interface ImportedBooking {
+export interface Booking {
   id: string
   user_id: string
   tc_booking_id: string
-  tc_microsite_id: string
   booking_reference?: string
+  microsite_id?: string
   title?: string
   destination?: string
   start_date?: string
   end_date?: string
-  status?: string
-  total_price?: number
-  currency?: string
+  status: string
   client_name?: string
   client_email?: string
   client_phone?: string
+  total_price?: number
+  currency: string
+  accommodations: any[]
+  activities: any[]
+  transports: any[]
+  vouchers: any[]
   imported_at: string
-  last_synced: string
-  full_data?: any
+  original_data?: any
+  created_at: string
+  updated_at: string
 }
 
-export interface ImportedTravelIdea {
+export interface TravelIdea {
   id: string
   user_id: string
   tc_idea_id: string
-  tc_microsite_id: string
+  microsite_id?: string
   title?: string
   description?: string
   image_url?: string
-  destination?: string
+  creation_date?: string
   departure_date?: string
-  price_per_person?: number
-  currency?: string
+  price_per_person: { amount: number; currency: string }
+  total_price: { amount: number; currency: string }
+  themes: any[]
+  destinations: any[]
+  customer: any
+  counters: any
   imported_at: string
-  last_synced: string
-  full_data?: any
+  original_data?: any
+  created_at: string
+  updated_at: string
 }
