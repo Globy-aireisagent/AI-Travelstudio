@@ -27,46 +27,88 @@ export async function POST(request: NextRequest) {
     const authData = await authResponse.json()
     const token = authData.token
 
-    // Haal agencies op
-    console.log(`📋 Fetching agencies from microsite ${credentials.micrositeId}...`)
+    // Haal ALLE agencies op - probeer verschillende limits
+    console.log(`📋 Fetching ALL agencies from microsite ${credentials.micrositeId}...`)
 
-    const agenciesResponse = await fetch(
-      `https://online.travelcompositor.com/resources/agency/${credentials.micrositeId}?first=0&limit=50`,
-      {
-        headers: {
-          "auth-token": token,
-          "Content-Type": "application/json",
-          Accept: "application/json",
+    const allAgencies: any[] = []
+    let currentPage = 0
+    const pageSize = 100 // Grotere page size
+
+    while (true) {
+      const agenciesResponse = await fetch(
+        `https://online.travelcompositor.com/resources/agency/${credentials.micrositeId}?first=${currentPage * pageSize}&limit=${pageSize}`,
+        {
+          headers: {
+            "auth-token": token,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
         },
-      },
-    )
+      )
 
-    if (!agenciesResponse.ok) {
-      const errorText = await agenciesResponse.text()
-      console.error("❌ Agencies fetch failed:", agenciesResponse.status, errorText)
+      if (!agenciesResponse.ok) {
+        const errorText = await agenciesResponse.text()
+        console.error("❌ Agencies fetch failed:", agenciesResponse.status, errorText)
 
-      return NextResponse.json({
-        success: false,
-        error: `Agencies fetch failed: ${agenciesResponse.status}`,
-        debug: {
-          status: agenciesResponse.status,
-          errorText: errorText.substring(0, 200),
-        },
-      })
+        return NextResponse.json({
+          success: false,
+          error: `Agencies fetch failed: ${agenciesResponse.status}`,
+          debug: {
+            status: agenciesResponse.status,
+            errorText: errorText.substring(0, 200),
+            page: currentPage,
+          },
+        })
+      }
+
+      const agenciesData = await agenciesResponse.json()
+      console.log(`📊 Page ${currentPage} agencies response:`, agenciesData)
+
+      const pageAgencies = agenciesData.agency || agenciesData.agencies || []
+
+      if (pageAgencies.length === 0) {
+        console.log(`📄 No more agencies found on page ${currentPage}`)
+        break
+      }
+
+      allAgencies.push(...pageAgencies)
+      console.log(`📋 Added ${pageAgencies.length} agencies from page ${currentPage}, total: ${allAgencies.length}`)
+
+      // Als we minder dan pageSize krijgen, zijn we klaar
+      if (pageAgencies.length < pageSize) {
+        break
+      }
+
+      currentPage++
+
+      // Safety break na 10 pagina's
+      if (currentPage >= 10) {
+        console.log("⚠️ Breaking after 10 pages to prevent infinite loop")
+        break
+      }
     }
 
-    const agenciesData = await agenciesResponse.json()
-    console.log("📊 Agencies API response:", agenciesData)
+    // Verrijk agencies met extra info
+    const enrichedAgencies = allAgencies.map((agency) => ({
+      id: agency.id,
+      name: agency.name || `Agency ${agency.id}`,
+      email: agency.email || agency.contactEmail || "",
+      phone: agency.phone || agency.contactPhone || "",
+      address: agency.address || "",
+      city: agency.city || "",
+      country: agency.country || "",
+      status: agency.status || "active",
+      createdDate: agency.createdDate || "",
+    }))
 
-    const agencies = agenciesData.agency || agenciesData.agencies || []
-
-    console.log(`✅ Found ${agencies.length} agencies in Newreisplan`)
+    console.log(`✅ Found ${enrichedAgencies.length} total agencies in Newreisplan`)
 
     return NextResponse.json({
       success: true,
       data: {
-        agencies: agencies,
-        totalAgencies: agencies.length,
+        agencies: enrichedAgencies,
+        totalAgencies: enrichedAgencies.length,
+        pagesProcessed: currentPage + 1,
         micrositeId: credentials.micrositeId,
       },
     })
