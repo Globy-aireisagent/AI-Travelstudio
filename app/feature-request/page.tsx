@@ -4,46 +4,55 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Send, Lightbulb, Sparkles } from "lucide-react"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { ArrowLeft, Send, Lightbulb, CheckCircle, AlertCircle } from "lucide-react"
 
 export default function FeatureRequestPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState("")
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     category: "",
     priority: "",
-    submitterEmail: "",
     submitterName: "",
+    submitterEmail: "",
   })
 
   const categories = [
-    { value: "ai-tools", label: "AI Tools" },
-    { value: "platform", label: "Platform" },
-    { value: "analytics", label: "Analytics" },
-    { value: "collaboration", label: "Samenwerking" },
-    { value: "integration", label: "Integraties" },
-    { value: "mobile", label: "Mobile" },
-    { value: "general", label: "Algemeen" },
+    {
+      value: "ai",
+      label: "🤖 AI & Machine Learning",
+      description: "AI-powered features en intelligente automatisering",
+    },
+    { value: "mobile", label: "📱 Mobile", description: "Mobile app features en responsive design" },
+    { value: "feature", label: "✨ Nieuwe Features", description: "Algemene nieuwe functionaliteiten" },
+    { value: "ui", label: "🎨 User Interface", description: "Design verbeteringen en UX optimalisaties" },
+    { value: "analytics", label: "📊 Analytics", description: "Rapportage en data analyse tools" },
+    { value: "technical", label: "⚙️ Technical", description: "Performance, security en technische verbeteringen" },
+    { value: "integration", label: "🔗 Integraties", description: "Third-party integraties en API's" },
+    { value: "general", label: "💡 Algemeen", description: "Overige suggesties en ideeën" },
   ]
 
   const priorities = [
-    { value: "low", label: "Laag", color: "bg-gray-100 text-gray-700" },
-    { value: "medium", label: "Gemiddeld", color: "bg-yellow-100 text-yellow-700" },
-    { value: "high", label: "Hoog", color: "bg-red-100 text-red-700" },
+    { value: "low", label: "🟢 Laag", description: "Nice to have, geen haast" },
+    { value: "medium", label: "🟡 Gemiddeld", description: "Belangrijk voor toekomstige releases" },
+    { value: "high", label: "🔴 Hoog", description: "Kritiek voor business operaties" },
+    { value: "urgent", label: "🚨 Urgent", description: "Moet zo snel mogelijk opgelost worden" },
   ]
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError("")
 
     try {
       const response = await fetch("/api/feature-requests", {
@@ -54,17 +63,15 @@ export default function FeatureRequestPage() {
         body: JSON.stringify(formData),
       })
 
-      const result = await response.json()
-
-      if (result.success) {
-        // Redirect back to dashboard with success message
-        router.push("/agent-dashboard?message=feature-request-submitted")
-      } else {
-        alert("Er ging iets mis: " + result.error)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to submit feature request")
       }
+
+      setSubmitted(true)
     } catch (error) {
       console.error("Error submitting feature request:", error)
-      alert("Er ging iets mis bij het versturen van je verzoek")
+      setError(error instanceof Error ? error.message : "Er is een fout opgetreden")
     } finally {
       setIsSubmitting(false)
     }
@@ -74,203 +81,220 @@ export default function FeatureRequestPage() {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b shadow-sm">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-green-50 flex items-center justify-center p-6">
+        <Card className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-0">
+          <CardContent className="p-12 text-center">
+            <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
+              <CheckCircle className="h-10 w-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-4">
+              Feature Request Ingediend! 🎉
+            </h1>
+            <p className="text-gray-600 mb-8 text-lg">
+              Bedankt voor je suggestie! We hebben je feature request ontvangen en zullen deze beoordelen. Je kunt nu
+              stemmen op andere features of terug naar het dashboard.
+            </p>
+            <div className="flex gap-4 justify-center">
               <Link href="/agent-dashboard">
-                <Button variant="outline" size="sm" className="rounded-xl bg-transparent">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                <Button className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105 px-8 py-3">
                   Terug naar Dashboard
                 </Button>
               </Link>
+              <Button
+                onClick={() => {
+                  setSubmitted(false)
+                  setFormData({
+                    title: "",
+                    description: "",
+                    category: "",
+                    priority: "",
+                    submitterName: "",
+                    submitterEmail: "",
+                  })
+                }}
+                variant="outline"
+                className="rounded-2xl px-8 py-3"
+              >
+                Nog een Request Indienen
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-sm border-b shadow-sm sticky top-0 z-50">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Link href="/agent-dashboard">
+                <Button variant="ghost" size="sm" className="rounded-2xl">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Terug
+                </Button>
+              </Link>
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Lightbulb className="h-6 w-6 text-white" />
+              </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Nieuw Feature Verzoek
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  Feature Request Indienen
                 </h1>
-                <p className="text-sm text-gray-600">Deel je idee voor nieuwe functionaliteit</p>
+                <p className="text-sm text-gray-600">Deel je ideeën voor nieuwe functionaliteiten</p>
               </div>
             </div>
-            <Badge className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-4 py-2 rounded-full shadow-lg">
-              <Lightbulb className="h-4 w-4 mr-2" />
-              Innovatie
-            </Badge>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
-        <div className="max-w-2xl mx-auto">
-          {/* Info Card */}
-          <Card className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200 shadow-lg rounded-3xl">
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
-                <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl">
-                  <Sparkles className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Hoe werkt het?</h3>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• Beschrijf je idee zo duidelijk mogelijk</li>
-                    <li>• Andere agents kunnen stemmen op je verzoek</li>
-                    <li>• Populaire verzoeken krijgen prioriteit in ontwikkeling</li>
-                    <li>• Je krijgt updates over de voortgang</li>
-                  </ul>
-                </div>
+      <main className="container mx-auto p-6 max-w-4xl">
+        <Card className="bg-white rounded-3xl shadow-2xl border-0">
+          <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-3xl">
+            <CardTitle className="text-2xl">Nieuw Feature Request</CardTitle>
+            <CardDescription className="text-purple-100">
+              Help ons AI Travel Studio te verbeteren door je ideeën te delen
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-8">
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <p className="text-red-700">{error}</p>
               </div>
-            </CardContent>
-          </Card>
+            )}
 
-          {/* Form */}
-          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm rounded-3xl">
-            <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-3xl p-6">
-              <CardTitle className="flex items-center">
-                <Lightbulb className="h-6 w-6 mr-2" />
-                Feature Verzoek Indienen
-              </CardTitle>
-              <CardDescription className="text-purple-100">
-                Vertel ons over je idee voor nieuwe functionaliteit
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Personal Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Jouw Naam *</label>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {/* Basic Info */}
+              <div className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="submitterName">Je Naam</Label>
                     <Input
+                      id="submitterName"
                       value={formData.submitterName}
                       onChange={(e) => handleInputChange("submitterName", e.target.value)}
-                      placeholder="Je volledige naam"
-                      required
-                      className="rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-400"
+                      placeholder="Bijv. Jan de Vries"
+                      className="rounded-2xl"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Adres *</label>
+                  <div className="space-y-2">
+                    <Label htmlFor="submitterEmail">Email Adres</Label>
                     <Input
+                      id="submitterEmail"
                       type="email"
                       value={formData.submitterEmail}
                       onChange={(e) => handleInputChange("submitterEmail", e.target.value)}
-                      placeholder="je@email.com"
-                      required
-                      className="rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-400"
+                      placeholder="jan@reisbureau.nl"
+                      className="rounded-2xl"
                     />
                   </div>
                 </div>
 
-                {/* Feature Details */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Feature Titel *</label>
+                <div className="space-y-2">
+                  <Label htmlFor="title">Feature Titel *</Label>
                   <Input
+                    id="title"
                     value={formData.title}
                     onChange={(e) => handleInputChange("title", e.target.value)}
-                    placeholder="Korte, duidelijke titel voor je feature"
+                    placeholder="Bijv. AI Hotel Aanbevelingen op basis van klantvoorkeuren"
                     required
-                    className="rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-400"
+                    className="rounded-2xl"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Beschrijving *</label>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Beschrijving *</Label>
                   <Textarea
+                    id="description"
                     value={formData.description}
                     onChange={(e) => handleInputChange("description", e.target.value)}
-                    placeholder="Beschrijf je idee in detail. Wat moet het doen? Hoe zou het werken? Waarom is het nuttig?"
+                    placeholder="Beschrijf je feature idee in detail. Wat moet het doen? Hoe zou het werken? Welk probleem lost het op?"
                     required
                     rows={6}
-                    className="rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-400"
+                    className="rounded-2xl"
                   />
                 </div>
+              </div>
 
-                {/* Category and Priority */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Categorie</label>
-                    <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
-                      <SelectTrigger className="rounded-xl border-gray-200">
-                        <SelectValue placeholder="Selecteer categorie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Prioriteit (jouw inschatting)
-                    </label>
-                    <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
-                      <SelectTrigger className="rounded-xl border-gray-200">
-                        <SelectValue placeholder="Selecteer prioriteit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {priorities.map((priority) => (
-                          <SelectItem key={priority.value} value={priority.value}>
-                            <div className="flex items-center space-x-2">
-                              <Badge className={`${priority.color} text-xs px-2 py-1`}>{priority.label}</Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {/* Category Selection */}
+              <div className="space-y-4">
+                <Label>Categorie *</Label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {categories.map((category) => (
+                    <div
+                      key={category.value}
+                      onClick={() => handleInputChange("category", category.value)}
+                      className={`p-4 border-2 rounded-2xl cursor-pointer transition-all duration-300 hover:shadow-lg ${
+                        formData.category === category.value
+                          ? "border-purple-500 bg-purple-50 shadow-lg"
+                          : "border-gray-200 hover:border-purple-300"
+                      }`}
+                    >
+                      <div className="font-medium text-sm">{category.label}</div>
+                      <div className="text-xs text-gray-600 mt-1">{category.description}</div>
+                    </div>
+                  ))}
                 </div>
+              </div>
 
-                {/* Submit Button */}
-                <div className="pt-6 border-t border-gray-200">
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting || !formData.title || !formData.description || !formData.submitterEmail}
-                    className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-2xl py-6 text-lg font-semibold"
-                  >
-                    {isSubmitting ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Versturen...
-                      </div>
-                    ) : (
-                      <div className="flex items-center">
-                        <Send className="h-5 w-5 mr-2" />
-                        Verzoek Indienen
-                      </div>
-                    )}
+              {/* Priority Selection */}
+              <div className="space-y-4">
+                <Label>Prioriteit *</Label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {priorities.map((priority) => (
+                    <div
+                      key={priority.value}
+                      onClick={() => handleInputChange("priority", priority.value)}
+                      className={`p-4 border-2 rounded-2xl cursor-pointer transition-all duration-300 hover:shadow-lg ${
+                        formData.priority === priority.value
+                          ? "border-purple-500 bg-purple-50 shadow-lg"
+                          : "border-gray-200 hover:border-purple-300"
+                      }`}
+                    >
+                      <div className="font-medium text-sm">{priority.label}</div>
+                      <div className="text-xs text-gray-600 mt-1">{priority.description}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex gap-4 pt-6">
+                <Button
+                  type="submit"
+                  disabled={
+                    isSubmitting || !formData.title || !formData.description || !formData.category || !formData.priority
+                  }
+                  className="flex-1 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105 py-3"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Indienen...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Feature Request Indienen
+                    </>
+                  )}
+                </Button>
+                <Link href="/agent-dashboard">
+                  <Button variant="outline" className="rounded-2xl px-8 py-3 bg-transparent">
+                    Annuleren
                   </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Tips Card */}
-          <Card className="mt-8 bg-gradient-to-r from-green-50 to-blue-50 border-green-200 shadow-lg rounded-3xl">
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-gray-800 mb-3">💡 Tips voor een goed verzoek:</h3>
-              <ul className="text-sm text-gray-600 space-y-2">
-                <li>
-                  • <strong>Wees specifiek:</strong> Beschrijf precies wat je wilt en waarom
-                </li>
-                <li>
-                  • <strong>Denk aan de gebruiker:</strong> Hoe zou dit andere agents helpen?
-                </li>
-                <li>
-                  • <strong>Geef voorbeelden:</strong> Concrete use cases maken je verzoek sterker
-                </li>
-                <li>
-                  • <strong>Check duplicaten:</strong> Kijk eerst of iemand anders al een soortgelijk verzoek heeft
-                  gedaan
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                </Link>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </main>
     </div>
   )
 }
