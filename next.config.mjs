@@ -1,21 +1,26 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  //  ✅ Allow the build to succeed even when ESLint reports errors.
+  reactStrictMode: true,
+  swcMinify: true,
+
+  /*--------------------------------------------------------------------
+   |  Build-time relaxations – remove these when your codebase is green |
+   *-------------------------------------------------------------------*/
   eslint: {
+    // Allow the build to succeed even with ESLint errors.
     ignoreDuringBuilds: true,
   },
-
-  //  ✅ Allow the build to succeed even when TypeScript has type errors.
-  //  (Be sure to keep type-checking in CI so production stays safe.)
   typescript: {
+    // Allow the build to succeed even with TS type-errors.
     ignoreBuildErrors: true,
   },
 
-  //  ✅ Disable next/image optimisations (useful when you don’t have
-  //  remote-loader config or when deploying on platforms without sharp).
+  /*------------------------------------------------------------
+   |  Images – Next.js on v0 cannot run the default optimiser |
+   *-----------------------------------------------------------*/
   images: {
     unoptimized: true,
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig
