@@ -34,7 +34,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import FeatureRoadmapInteractive from "@/components/feature-roadmap-interactive"
+
+// Import the feature roadmap component dynamically to avoid SSR issues
+const FeatureRoadmapInteractive = dynamic(() => import("@/components/feature-roadmap-interactive"), {
+  ssr: false,
+  loading: () => <div className="p-8 text-center">Feature roadmap laden...</div>,
+})
+
+import dynamic from "next/dynamic"
 
 export default function AgentDashboardClient() {
   const [userBookings, setUserBookings] = useState([])
@@ -54,40 +61,15 @@ export default function AgentDashboardClient() {
   const loadDashboardData = async () => {
     setIsLoading(true)
     try {
-      // Load user bookings (from imported TC data)
-      const bookingsResponse = await fetch("/api/user-bookings")
-      if (bookingsResponse.ok) {
-        const bookingsData = await bookingsResponse.json()
-        setUserBookings(bookingsData.bookings || [])
-      }
+      // Simulate loading for now - replace with actual API calls
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      // Load user travel ideas
-      const ideasResponse = await fetch("/api/user-ideas")
-      if (ideasResponse.ok) {
-        const ideasData = await ideasResponse.json()
-        setUserIdeas(ideasData.ideas || [])
-      }
-
-      // Load clients
-      const clientsResponse = await fetch("/api/user-clients")
-      if (clientsResponse.ok) {
-        const clientsData = await clientsResponse.json()
-        setClients(clientsData.clients || [])
-      }
-
-      // Load my projects (AI Travel Studio work)
-      const projectsResponse = await fetch("/api/my-projects")
-      if (projectsResponse.ok) {
-        const projectsData = await projectsResponse.json()
-        setMyProjects(projectsData.projects || [])
-      }
-
-      // Load travel buddies
-      const buddiesResponse = await fetch("/api/travel-buddies")
-      if (buddiesResponse.ok) {
-        const buddiesData = await buddiesResponse.json()
-        setTravelBuddies(buddiesData.buddies || [])
-      }
+      // Set demo data
+      setUserBookings([])
+      setUserIdeas([])
+      setClients([])
+      setMyProjects([])
+      setTravelBuddies([])
     } catch (error) {
       console.error("Failed to load dashboard data:", error)
     } finally {
@@ -261,6 +243,17 @@ export default function AgentDashboardClient() {
     )
   })
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Dashboard laden...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
@@ -280,13 +273,14 @@ export default function AgentDashboardClient() {
             </div>
             <div className="flex items-center space-x-4">
               <Badge className="bg-green-100 text-green-700 px-3 py-1 rounded-full">Professional Plan</Badge>
-              <Button
-                variant="outline"
-                className="rounded-xl shadow-sm hover:shadow-md transition-all bg-transparent"
-                onClick={() => (window.location.href = "/")}
-              >
-                🏠 Home
-              </Button>
+              <Link href="/">
+                <Button
+                  variant="outline"
+                  className="rounded-xl shadow-sm hover:shadow-md transition-all bg-transparent"
+                >
+                  🏠 Home
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

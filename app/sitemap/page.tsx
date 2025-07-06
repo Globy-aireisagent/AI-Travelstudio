@@ -1,467 +1,595 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Search,
   ExternalLink,
-  Globe,
-  Settings,
+  Home,
+  Users,
   FileText,
   Bot,
   Upload,
+  BarChart3,
+  Shield,
   Code,
   TestTube,
-  Map,
-  Home,
-  User,
-  Eye,
   Wrench,
-  MessageCircle,
-  BarChart3,
-  Filter,
-  ChevronRight,
+  Map,
+  Sparkles,
+  Eye,
+  Clock,
+  CheckCircle,
+  Info,
 } from "lucide-react"
 import Link from "next/link"
 
+interface SitemapPage {
+  title: string
+  path: string
+  description: string
+  category: string
+  status: "live" | "beta" | "dev" | "demo"
+  accessLevel: "public" | "agent" | "admin" | "user"
+  icon?: React.ReactNode
+}
+
+const sitemapPages: SitemapPage[] = [
+  // Main Pages
+  {
+    title: "Home",
+    path: "/",
+    description: "AI Travel Studio hoofdpagina",
+    category: "main",
+    status: "live",
+    accessLevel: "public",
+    icon: <Home className="h-4 w-4" />,
+  },
+  {
+    title: "Agent Dashboard",
+    path: "/agent-dashboard",
+    description: "Hoofddashboard voor reisagenten",
+    category: "main",
+    status: "live",
+    accessLevel: "agent",
+    icon: <Users className="h-4 w-4" />,
+  },
+  {
+    title: "Travel Generator",
+    path: "/travel-generator",
+    description: "AI content generator voor reizen",
+    category: "main",
+    status: "live",
+    accessLevel: "agent",
+    icon: <Sparkles className="h-4 w-4" />,
+  },
+  {
+    title: "Travel Buddy",
+    path: "/travelbuddy",
+    description: "AI chatbot beheer voor klanten",
+    category: "main",
+    status: "live",
+    accessLevel: "agent",
+    icon: <Bot className="h-4 w-4" />,
+  },
+  {
+    title: "Import Center",
+    path: "/import",
+    description: "Data import uit Travel Compositor",
+    category: "main",
+    status: "live",
+    accessLevel: "agent",
+    icon: <Upload className="h-4 w-4" />,
+  },
+
+  // Travel Content & Generation
+  {
+    title: "Travel Content Generator Final",
+    path: "/travel-generator",
+    description: "Definitieve versie van content generator",
+    category: "content",
+    status: "live",
+    accessLevel: "agent",
+  },
+  {
+    title: "Travel Werkblad",
+    path: "/travelwerkblad",
+    description: "Werkblad voor reisplanning",
+    category: "content",
+    status: "live",
+    accessLevel: "agent",
+  },
+  {
+    title: "Werkblad",
+    path: "/werkblad",
+    description: "Algemeen werkblad systeem",
+    category: "content",
+    status: "live",
+    accessLevel: "agent",
+  },
+  {
+    title: "Travel Text Generator",
+    path: "/travel-text-generator",
+    description: "Tekst generator voor reizen",
+    category: "content",
+    status: "beta",
+    accessLevel: "agent",
+  },
+  {
+    title: "Travel Image Generator",
+    path: "/travel-image-generator",
+    description: "AI afbeelding generator",
+    category: "content",
+    status: "beta",
+    accessLevel: "agent",
+  },
+
+  // Roadbooks & Templates
+  {
+    title: "Roadbook Universal",
+    path: "/roadbook/universal/[id]",
+    description: "Universele roadbook template",
+    category: "roadbooks",
+    status: "live",
+    accessLevel: "user",
+  },
+  {
+    title: "Roadbook Booking",
+    path: "/roadbook/booking-[id]",
+    description: "Booking-specifieke roadbook",
+    category: "roadbooks",
+    status: "live",
+    accessLevel: "user",
+  },
+  {
+    title: "Roadbook Dynamic",
+    path: "/roadbook/[id]",
+    description: "Dynamische roadbook pagina",
+    category: "roadbooks",
+    status: "live",
+    accessLevel: "user",
+  },
+  {
+    title: "Roadbook Slug",
+    path: "/roadbook/[slug]",
+    description: "Roadbook met slug routing",
+    category: "roadbooks",
+    status: "live",
+    accessLevel: "user",
+  },
+
+  // Travel Buddy & Chat
+  {
+    title: "Travel Buddy Generator",
+    path: "/agent-travelbuddy-generator",
+    description: "Generator voor travel buddy bots",
+    category: "chatbots",
+    status: "live",
+    accessLevel: "agent",
+  },
+  {
+    title: "Travel Buddy Example",
+    path: "/travelbuddy-example",
+    description: "Voorbeeld van travel buddy",
+    category: "chatbots",
+    status: "demo",
+    accessLevel: "public",
+  },
+  {
+    title: "Travel Buddy Booking",
+    path: "/travelbuddy/[bookingId]",
+    description: "Booking-specifieke travel buddy",
+    category: "chatbots",
+    status: "live",
+    accessLevel: "user",
+  },
+  {
+    title: "Chat Interface",
+    path: "/chat/[slug]",
+    description: "Chat interface voor klanten",
+    category: "chatbots",
+    status: "live",
+    accessLevel: "user",
+  },
+
+  // Import & Data Management
+  {
+    title: "Import V2",
+    path: "/import-v2",
+    description: "Verbeterde import functionaliteit",
+    category: "import",
+    status: "beta",
+    accessLevel: "agent",
+  },
+  {
+    title: "Universal Import",
+    path: "/universal-import",
+    description: "Universele import wizard",
+    category: "import",
+    status: "beta",
+    accessLevel: "agent",
+  },
+  {
+    title: "Selective Import",
+    path: "/selective-import",
+    description: "Selectieve data import",
+    category: "import",
+    status: "beta",
+    accessLevel: "agent",
+  },
+  {
+    title: "Travel Compositor Import",
+    path: "/travel-compositor-import",
+    description: "Travel Compositor data import",
+    category: "import",
+    status: "live",
+    accessLevel: "agent",
+  },
+  {
+    title: "Single Microsite Test",
+    path: "/single-microsite-test",
+    description: "Test voor enkele microsite import",
+    category: "import",
+    status: "dev",
+    accessLevel: "agent",
+  },
+  {
+    title: "Secure User Import",
+    path: "/secure-user-import",
+    description: "Beveiligde gebruiker import",
+    category: "import",
+    status: "beta",
+    accessLevel: "admin",
+  },
+
+  // Admin & Management
+  {
+    title: "Admin Control Center",
+    path: "/admin/control-center",
+    description: "Hoofdbeheer centrum",
+    category: "admin",
+    status: "live",
+    accessLevel: "admin",
+  },
+  {
+    title: "Admin Login",
+    path: "/admin-login",
+    description: "Admin inlog pagina",
+    category: "admin",
+    status: "live",
+    accessLevel: "public",
+  },
+  {
+    title: "Master Dashboard",
+    path: "/master-dashboard",
+    description: "Master beheer dashboard",
+    category: "admin",
+    status: "live",
+    accessLevel: "admin",
+  },
+  {
+    title: "User Dashboard",
+    path: "/user-dashboard",
+    description: "Gebruiker dashboard",
+    category: "admin",
+    status: "live",
+    accessLevel: "user",
+  },
+  {
+    title: "Demo Dashboard",
+    path: "/demo-dashboard",
+    description: "Demo versie van dashboard",
+    category: "admin",
+    status: "demo",
+    accessLevel: "public",
+  },
+
+  // Analytics & Monitoring
+  {
+    title: "Analytics Dashboard",
+    path: "/analytics",
+    description: "Analytics en statistieken",
+    category: "analytics",
+    status: "beta",
+    accessLevel: "admin",
+  },
+  {
+    title: "Performance Monitor",
+    path: "/performance",
+    description: "Performance monitoring",
+    category: "analytics",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Webhook Dashboard",
+    path: "/webhook-dashboard",
+    description: "Webhook beheer en monitoring",
+    category: "analytics",
+    status: "beta",
+    accessLevel: "admin",
+  },
+
+  // Testing & Debug
+  {
+    title: "Test Travel Compositor",
+    path: "/test-travel-compositor",
+    description: "Test Travel Compositor API",
+    category: "testing",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Debug Travel Compositor",
+    path: "/debug-travel-compositor",
+    description: "Debug Travel Compositor verbinding",
+    category: "testing",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Test Booking Search",
+    path: "/test-booking-search",
+    description: "Test booking zoekfunctie",
+    category: "testing",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Debug Booking Data",
+    path: "/debug-booking-data",
+    description: "Debug booking data structuur",
+    category: "testing",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Test Endpoints",
+    path: "/test-endpoints",
+    description: "Test alle API endpoints",
+    category: "testing",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Debug Connection",
+    path: "/debug-connection",
+    description: "Debug database verbindingen",
+    category: "testing",
+    status: "dev",
+    accessLevel: "admin",
+  },
+
+  // API Documentation & Tools
+  {
+    title: "Swagger Analysis",
+    path: "/swagger-analysis",
+    description: "Swagger API documentatie analyse",
+    category: "api",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Swagger Detailed Analysis",
+    path: "/swagger-detailed-analysis",
+    description: "Gedetailleerde Swagger analyse",
+    category: "api",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Discover Endpoints",
+    path: "/discover-endpoints",
+    description: "Ontdek beschikbare API endpoints",
+    category: "api",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Generate TypeScript Types",
+    path: "/generate-typescript-types",
+    description: "Genereer TypeScript types",
+    category: "api",
+    status: "dev",
+    accessLevel: "admin",
+  },
+
+  // Feature Management
+  {
+    title: "Feature Requests",
+    path: "/feature-request",
+    description: "Feature verzoeken en roadmap",
+    category: "features",
+    status: "live",
+    accessLevel: "agent",
+  },
+  {
+    title: "GPT Builder",
+    path: "/gpt-builder",
+    description: "GPT configuratie builder",
+    category: "features",
+    status: "beta",
+    accessLevel: "agent",
+  },
+  {
+    title: "Agent Onboarding",
+    path: "/agent-onboarding",
+    description: "Onboarding voor nieuwe agenten",
+    category: "features",
+    status: "beta",
+    accessLevel: "agent",
+  },
+  {
+    title: "Agent Profile",
+    path: "/agent-profile/[id]",
+    description: "Agent profiel pagina",
+    category: "features",
+    status: "beta",
+    accessLevel: "agent",
+  },
+
+  // Utilities & Tools
+  {
+    title: "Sitemap",
+    path: "/sitemap",
+    description: "Complete site overzicht",
+    category: "utilities",
+    status: "live",
+    accessLevel: "public",
+  },
+  {
+    title: "Help",
+    path: "/help",
+    description: "Help en documentatie",
+    category: "utilities",
+    status: "live",
+    accessLevel: "public",
+  },
+  {
+    title: "About",
+    path: "/about",
+    description: "Over AI Travel Studio",
+    category: "utilities",
+    status: "live",
+    accessLevel: "public",
+  },
+  {
+    title: "Privacy",
+    path: "/privacy",
+    description: "Privacy beleid",
+    category: "utilities",
+    status: "live",
+    accessLevel: "public",
+  },
+  {
+    title: "Terms",
+    path: "/terms",
+    description: "Algemene voorwaarden",
+    category: "utilities",
+    status: "live",
+    accessLevel: "public",
+  },
+
+  // Offers & Packages
+  {
+    title: "Offerte",
+    path: "/offerte/[id]",
+    description: "Offerte pagina",
+    category: "offers",
+    status: "live",
+    accessLevel: "user",
+  },
+  {
+    title: "Package Offerte",
+    path: "/offerte/package-[id]",
+    description: "Package offerte pagina",
+    category: "offers",
+    status: "live",
+    accessLevel: "user",
+  },
+  {
+    title: "Intake Preview",
+    path: "/intake-preview",
+    description: "Preview van intake formulier",
+    category: "offers",
+    status: "live",
+    accessLevel: "agent",
+  },
+
+  // Remote & External
+  {
+    title: "Remote Ideas",
+    path: "/remote-ideas",
+    description: "Remote travel ideas browser",
+    category: "remote",
+    status: "beta",
+    accessLevel: "agent",
+  },
+  {
+    title: "Test Ideas",
+    path: "/test-ideas",
+    description: "Test travel ideas functionaliteit",
+    category: "remote",
+    status: "dev",
+    accessLevel: "admin",
+  },
+  {
+    title: "Simple Idea Test",
+    path: "/simple-idea-test",
+    description: "Eenvoudige idea test",
+    category: "remote",
+    status: "dev",
+    accessLevel: "admin",
+  },
+]
+
+const categories = [
+  { id: "main", name: "Hoofdpagina's", icon: <Home className="h-5 w-5" />, color: "from-blue-500 to-blue-600" },
+  {
+    id: "content",
+    name: "Content & Generatie",
+    icon: <FileText className="h-5 w-5" />,
+    color: "from-green-500 to-green-600",
+  },
+  { id: "roadbooks", name: "Roadbooks", icon: <Map className="h-5 w-5" />, color: "from-purple-500 to-purple-600" },
+  { id: "chatbots", name: "Chatbots & AI", icon: <Bot className="h-5 w-5" />, color: "from-pink-500 to-pink-600" },
+  { id: "import", name: "Import & Data", icon: <Upload className="h-5 w-5" />, color: "from-orange-500 to-orange-600" },
+  { id: "admin", name: "Beheer", icon: <Shield className="h-5 w-5" />, color: "from-red-500 to-red-600" },
+  {
+    id: "analytics",
+    name: "Analytics",
+    icon: <BarChart3 className="h-5 w-5" />,
+    color: "from-indigo-500 to-indigo-600",
+  },
+  {
+    id: "testing",
+    name: "Testing & Debug",
+    icon: <TestTube className="h-5 w-5" />,
+    color: "from-yellow-500 to-yellow-600",
+  },
+  { id: "api", name: "API & Tools", icon: <Code className="h-5 w-5" />, color: "from-teal-500 to-teal-600" },
+  { id: "utilities", name: "Utilities", icon: <Wrench className="h-5 w-5" />, color: "from-gray-500 to-gray-600" },
+]
+
 export default function SitemapPage() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [categoryFilter, setCategoryFilter] = useState("all")
 
-  // Complete sitemap data organized by categories
-  const sitemapData = {
-    "🏠 Main Pages": {
-      icon: <Home className="h-5 w-5" />,
-      color: "bg-blue-100 text-blue-700",
-      pages: [
-        { path: "/", title: "Homepage", description: "AI Travel Studio hoofdpagina", status: "live", access: "public" },
-        {
-          path: "/about",
-          title: "Over Ons",
-          description: "Informatie over het platform",
-          status: "live",
-          access: "public",
-        },
-        {
-          path: "/help",
-          title: "Help & Support",
-          description: "Hulp en documentatie",
-          status: "live",
-          access: "public",
-        },
-        { path: "/privacy", title: "Privacy Policy", description: "Privacybeleid", status: "live", access: "public" },
-        {
-          path: "/terms",
-          title: "Terms of Service",
-          description: "Algemene voorwaarden",
-          status: "live",
-          access: "public",
-        },
-      ],
-    },
-    "👤 User & Auth": {
-      icon: <User className="h-5 w-5" />,
-      color: "bg-green-100 text-green-700",
-      pages: [
-        {
-          path: "/agent-dashboard",
-          title: "Agent Dashboard",
-          description: "Hoofddashboard voor reisagenten",
-          status: "live",
-          access: "agent",
-        },
-        {
-          path: "/user-dashboard",
-          title: "User Dashboard",
-          description: "Gebruikersdashboard",
-          status: "live",
-          access: "user",
-        },
-        {
-          path: "/admin-login",
-          title: "Admin Login",
-          description: "Inlogpagina voor beheerders",
-          status: "live",
-          access: "public",
-        },
-        {
-          path: "/secure-user-import",
-          title: "Secure User Import",
-          description: "Veilige gebruikersimport",
-          status: "live",
-          access: "admin",
-        },
-      ],
-    },
-    "🔧 Admin & Control": {
-      icon: <Settings className="h-5 w-5" />,
-      color: "bg-purple-100 text-purple-700",
-      pages: [
-        {
-          path: "/admin/control-center",
-          title: "Control Center",
-          description: "Hoofdbeheercentrum",
-          status: "live",
-          access: "admin",
-        },
-        {
-          path: "/master-dashboard",
-          title: "Master Dashboard",
-          description: "Master overzichtsdashboard",
-          status: "live",
-          access: "admin",
-        },
-        {
-          path: "/demo-dashboard",
-          title: "Demo Dashboard",
-          description: "Demo versie van dashboard",
-          status: "demo",
-          access: "public",
-        },
-      ],
-    },
-    "🤖 AI Tools": {
-      icon: <Bot className="h-5 w-5" />,
-      color: "bg-pink-100 text-pink-700",
-      pages: [
-        {
-          path: "/travel-generator",
-          title: "Travel Content Generator",
-          description: "AI content generator voor reizen",
-          status: "live",
-          access: "agent",
-        },
-        {
-          path: "/travelbuddy",
-          title: "Travel Buddy",
-          description: "AI chatbot beheer",
-          status: "live",
-          access: "agent",
-        },
-        {
-          path: "/travelbuddy-example",
-          title: "Travel Buddy Example",
-          description: "Voorbeeld van travel buddy",
-          status: "demo",
-          access: "public",
-        },
-        {
-          path: "/gpt-builder",
-          title: "GPT Builder",
-          description: "Custom GPT builder interface",
-          status: "beta",
-          access: "agent",
-        },
-        {
-          path: "/agent-travelbuddy-generator",
-          title: "Agent Travel Buddy Generator",
-          description: "Generator voor agent travel buddies",
-          status: "live",
-          access: "agent",
-        },
-      ],
-    },
-    "📥 Import & Data": {
-      icon: <Upload className="h-5 w-5" />,
-      color: "bg-orange-100 text-orange-700",
-      pages: [
-        { path: "/import", title: "Data Import", description: "Hoofdimport pagina", status: "live", access: "agent" },
-        {
-          path: "/import-v2",
-          title: "Import V2",
-          description: "Verbeterde import interface",
-          status: "beta",
-          access: "agent",
-        },
-        {
-          path: "/universal-import",
-          title: "Universal Import",
-          description: "Universele import wizard",
-          status: "live",
-          access: "agent",
-        },
-        {
-          path: "/selective-import",
-          title: "Selective Import",
-          description: "Selectieve import tool",
-          status: "live",
-          access: "agent",
-        },
-        {
-          path: "/travel-compositor-import",
-          title: "Travel Compositor Import",
-          description: "Travel Compositor data import",
-          status: "live",
-          access: "agent",
-        },
-        {
-          path: "/single-microsite-test",
-          title: "Single Microsite Test",
-          description: "Test voor enkele microsite",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/agent-booking-import",
-          title: "Agent Booking Import",
-          description: "Booking import voor agents",
-          status: "live",
-          access: "agent",
-        },
-      ],
-    },
-    "📋 Roadbooks & Templates": {
-      icon: <FileText className="h-5 w-5" />,
-      color: "bg-teal-100 text-teal-700",
-      pages: [
-        {
-          path: "/werkblad",
-          title: "Werkblad",
-          description: "Hoofdwerkblad interface",
-          status: "live",
-          access: "agent",
-        },
-        {
-          path: "/travelwerkblad",
-          title: "Travel Werkblad",
-          description: "Travel specifiek werkblad",
-          status: "live",
-          access: "agent",
-        },
-        {
-          path: "/roadbook/[id]",
-          title: "Roadbook Viewer",
-          description: "Roadbook weergave",
-          status: "live",
-          access: "public",
-        },
-        {
-          path: "/roadbook/universal/[id]",
-          title: "Universal Roadbook",
-          description: "Universele roadbook template",
-          status: "live",
-          access: "public",
-        },
-        {
-          path: "/roadbook/booking-[id]",
-          title: "Booking Roadbook",
-          description: "Booking specifieke roadbook",
-          status: "live",
-          access: "public",
-        },
-        {
-          path: "/offerte/[id]",
-          title: "Offerte Viewer",
-          description: "Offerte weergave",
-          status: "live",
-          access: "public",
-        },
-        {
-          path: "/offerte/package-[id]",
-          title: "Package Offerte",
-          description: "Pakket offerte weergave",
-          status: "live",
-          access: "public",
-        },
-      ],
-    },
-    "💬 Chat & Communication": {
-      icon: <MessageCircle className="h-5 w-5" />,
-      color: "bg-indigo-100 text-indigo-700",
-      pages: [
-        {
-          path: "/chat/[slug]",
-          title: "Chat Interface",
-          description: "Chat interface voor klanten",
-          status: "live",
-          access: "public",
-        },
-        {
-          path: "/travelbuddy/[bookingId]",
-          title: "Travel Buddy Chat",
-          description: "Booking specifieke chat",
-          status: "live",
-          access: "public",
-        },
-        {
-          path: "/intake-preview",
-          title: "Intake Preview",
-          description: "Preview van intake formulier",
-          status: "live",
-          access: "agent",
-        },
-      ],
-    },
-    "🔍 Testing & Debug": {
-      icon: <TestTube className="h-5 w-5" />,
-      color: "bg-red-100 text-red-700",
-      pages: [
-        {
-          path: "/test-travel-compositor",
-          title: "Test Travel Compositor",
-          description: "Travel Compositor API test",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/debug-travel-compositor",
-          title: "Debug Travel Compositor",
-          description: "Travel Compositor debug tools",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/debug-auth",
-          title: "Debug Auth",
-          description: "Authenticatie debug tools",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/debug-connection",
-          title: "Debug Connection",
-          description: "Verbinding debug tools",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/test-booking-search",
-          title: "Test Booking Search",
-          description: "Booking zoek functie test",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/test-endpoints",
-          title: "Test Endpoints",
-          description: "API endpoints testen",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/debug-import",
-          title: "Debug Import",
-          description: "Import functionaliteit debuggen",
-          status: "dev",
-          access: "admin",
-        },
-      ],
-    },
-    "📊 Analytics & Reports": {
-      icon: <BarChart3 className="h-5 w-5" />,
-      color: "bg-yellow-100 text-yellow-700",
-      pages: [
-        {
-          path: "/analyze-booking-data",
-          title: "Analyze Booking Data",
-          description: "Booking data analyse",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/analyze-content-data",
-          title: "Analyze Content Data",
-          description: "Content data analyse",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/swagger-analysis",
-          title: "Swagger Analysis",
-          description: "API documentatie analyse",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/discover-endpoints",
-          title: "Discover Endpoints",
-          description: "API endpoints ontdekken",
-          status: "dev",
-          access: "admin",
-        },
-        {
-          path: "/webhook-dashboard",
-          title: "Webhook Dashboard",
-          description: "Webhook beheer dashboard",
-          status: "live",
-          access: "admin",
-        },
-      ],
-    },
-    "🌐 Remote & External": {
-      icon: <Globe className="h-5 w-5" />,
-      color: "bg-cyan-100 text-cyan-700",
-      pages: [
-        {
-          path: "/remote-ideas",
-          title: "Remote Ideas",
-          description: "Externe travel ideas browser",
-          status: "live",
-          access: "agent",
-        },
-        {
-          path: "/test-newreisplan-import",
-          title: "NewReisplan Import Test",
-          description: "NewReisplan import testen",
-          status: "dev",
-          access: "admin",
-        },
-      ],
-    },
-    "⚙️ System & Utils": {
-      icon: <Wrench className="h-5 w-5" />,
-      color: "bg-gray-100 text-gray-700",
-      pages: [
-        {
-          path: "/sitemap",
-          title: "Sitemap",
-          description: "Deze pagina - overzicht van alle routes",
-          status: "live",
-          access: "public",
-        },
-        {
-          path: "/feature-request",
-          title: "Feature Requests",
-          description: "Feature verzoeken en roadmap",
-          status: "live",
-          access: "agent",
-        },
-      ],
-    },
+  const filteredPages = useMemo(() => {
+    return sitemapPages.filter((page) => {
+      const matchesSearch =
+        page.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        page.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        page.path.toLowerCase().includes(searchTerm.toLowerCase())
+
+      const matchesStatus = statusFilter === "all" || page.status === statusFilter
+      const matchesCategory = categoryFilter === "all" || page.category === categoryFilter
+
+      return matchesSearch && matchesStatus && matchesCategory
+    })
+  }, [searchTerm, statusFilter, categoryFilter])
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "live":
+        return <CheckCircle className="h-3 w-3" />
+      case "beta":
+        return <Clock className="h-3 w-3" />
+      case "dev":
+        return <Wrench className="h-3 w-3" />
+      case "demo":
+        return <Eye className="h-3 w-3" />
+      default:
+        return <Info className="h-3 w-3" />
+    }
   }
-
-  // Calculate total pages
-  const totalPages = Object.values(sitemapData).reduce((total, category) => total + category.pages.length, 0)
-  const livePages = Object.values(sitemapData).reduce(
-    (total, category) => total + category.pages.filter((page) => page.status === "live").length,
-    0,
-  )
-
-  // Filter pages based on search and category
-  const filteredData = Object.entries(sitemapData).reduce(
-    (acc, [categoryName, categoryData]) => {
-      const filteredPages = categoryData.pages.filter((page) => {
-        const matchesSearch =
-          searchTerm === "" ||
-          page.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          page.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          page.path.toLowerCase().includes(searchTerm.toLowerCase())
-
-        const matchesCategory = selectedCategory === "all" || page.status === selectedCategory
-
-        return matchesSearch && matchesCategory
-      })
-
-      if (filteredPages.length > 0) {
-        acc[categoryName] = { ...categoryData, pages: filteredPages }
-      }
-      return acc
-    },
-    {} as typeof sitemapData,
-  )
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -470,7 +598,7 @@ export default function SitemapPage() {
       case "beta":
         return "bg-blue-100 text-blue-700"
       case "dev":
-        return "bg-orange-100 text-orange-700"
+        return "bg-yellow-100 text-yellow-700"
       case "demo":
         return "bg-purple-100 text-purple-700"
       default:
@@ -478,19 +606,27 @@ export default function SitemapPage() {
     }
   }
 
-  const getAccessColor = (access: string) => {
-    switch (access) {
+  const getAccessLevelColor = (level: string) => {
+    switch (level) {
       case "public":
-        return "bg-green-100 text-green-700"
+        return "bg-green-50 text-green-600 border-green-200"
       case "agent":
-        return "bg-blue-100 text-blue-700"
+        return "bg-blue-50 text-blue-600 border-blue-200"
       case "admin":
-        return "bg-red-100 text-red-700"
+        return "bg-red-50 text-red-600 border-red-200"
       case "user":
-        return "bg-purple-100 text-purple-700"
+        return "bg-purple-50 text-purple-600 border-purple-200"
       default:
-        return "bg-gray-100 text-gray-700"
+        return "bg-gray-50 text-gray-600 border-gray-200"
     }
+  }
+
+  const stats = {
+    total: sitemapPages.length,
+    live: sitemapPages.filter((p) => p.status === "live").length,
+    beta: sitemapPages.filter((p) => p.status === "beta").length,
+    dev: sitemapPages.filter((p) => p.status === "dev").length,
+    demo: sitemapPages.filter((p) => p.status === "demo").length,
   }
 
   return (
@@ -501,233 +637,205 @@ export default function SitemapPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Map className="h-6 w-6 text-white" />
+                <Map className="h-5 w-5 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   AI Travel Studio - Sitemap
                 </h1>
-                <p className="text-sm text-gray-600">Overzicht van alle pagina's en functionaliteiten</p>
+                <p className="text-sm text-gray-600">Complete overzicht van alle pagina's</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <Badge className="bg-green-100 text-green-700 px-3 py-1 rounded-full">
-                {livePages}/{totalPages} Live
-              </Badge>
-              <Link href="/">
-                <Button
-                  variant="outline"
-                  className="rounded-xl shadow-sm hover:shadow-md transition-all bg-transparent"
-                >
-                  <Home className="h-4 w-4 mr-2" />
-                  Home
-                </Button>
-              </Link>
-            </div>
+            <Link href="/">
+              <Button variant="outline" className="rounded-xl shadow-sm hover:shadow-md transition-all bg-transparent">
+                <Home className="h-4 w-4 mr-2" />
+                Terug naar Home
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-6 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm font-medium">Totaal Pagina's</p>
-                  <p className="text-3xl font-bold">{totalPages}</p>
-                </div>
-                <Globe className="h-8 w-8 text-blue-200" />
-              </div>
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="text-blue-100 text-sm">Totaal Pagina's</div>
             </CardContent>
           </Card>
-
           <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm font-medium">Live Pagina's</p>
-                  <p className="text-3xl font-bold">{livePages}</p>
-                </div>
-                <Eye className="h-8 w-8 text-green-200" />
-              </div>
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-bold">{stats.live}</div>
+              <div className="text-green-100 text-sm">Live</div>
             </CardContent>
           </Card>
-
+          <Card className="bg-gradient-to-r from-blue-400 to-blue-500 text-white border-0 shadow-lg">
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-bold">{stats.beta}</div>
+              <div className="text-blue-100 text-sm">Beta</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white border-0 shadow-lg">
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-bold">{stats.dev}</div>
+              <div className="text-yellow-100 text-sm">Development</div>
+            </CardContent>
+          </Card>
           <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-sm font-medium">Categorieën</p>
-                  <p className="text-3xl font-bold">{Object.keys(sitemapData).length}</p>
-                </div>
-                <Filter className="h-8 w-8 text-purple-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100 text-sm font-medium">In Ontwikkeling</p>
-                  <p className="text-3xl font-bold">
-                    {Object.values(sitemapData).reduce(
-                      (total, category) =>
-                        total + category.pages.filter((page) => page.status === "dev" || page.status === "beta").length,
-                      0,
-                    )}
-                  </p>
-                </div>
-                <Code className="h-8 w-8 text-orange-200" />
-              </div>
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-bold">{stats.demo}</div>
+              <div className="text-purple-100 text-sm">Demo</div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Search and Filter */}
-        <div className="flex gap-4 mb-8">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Zoek pagina's, beschrijvingen, routes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-white/80 backdrop-blur-sm border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-            />
-          </div>
-          <div className="flex gap-2">
-            {["all", "live", "beta", "dev", "demo"].map((status) => (
-              <Button
-                key={status}
-                variant={selectedCategory === status ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedCategory(status)}
-                className="rounded-xl"
-              >
-                {status === "all" ? "Alle" : status.charAt(0).toUpperCase() + status.slice(1)}
-              </Button>
-            ))}
-          </div>
+        {/* Filters */}
+        <Card className="mb-8 shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Zoek pagina's, beschrijvingen, routes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white/80 backdrop-blur-sm border-gray-200 focus:border-blue-400 focus:ring-blue-400"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full md:w-48 bg-white/80 backdrop-blur-sm border-gray-200">
+                  <SelectValue placeholder="Filter status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle statussen</SelectItem>
+                  <SelectItem value="live">Live</SelectItem>
+                  <SelectItem value="beta">Beta</SelectItem>
+                  <SelectItem value="dev">Development</SelectItem>
+                  <SelectItem value="demo">Demo</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full md:w-48 bg-white/80 backdrop-blur-sm border-gray-200">
+                  <SelectValue placeholder="Filter categorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle categorieën</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Results */}
+        <div className="mb-6">
+          <p className="text-gray-600">
+            {filteredPages.length} van {sitemapPages.length} pagina's
+            {searchTerm && ` voor "${searchTerm}"`}
+          </p>
         </div>
 
-        {/* Categories */}
+        {/* Categories Grid */}
         <div className="space-y-8">
-          {Object.entries(filteredData).map(([categoryName, categoryData]) => (
-            <Card
-              key={categoryName}
-              className="shadow-xl border-0 bg-white/90 backdrop-blur-sm rounded-3xl overflow-hidden"
-            >
-              <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-2xl ${categoryData.color}`}>{categoryData.icon}</div>
-                    <div>
-                      <CardTitle className="text-xl text-gray-800">{categoryName}</CardTitle>
-                      <CardDescription className="text-gray-600">
-                        {categoryData.pages.length} pagina{categoryData.pages.length !== 1 ? "'s" : ""}
-                      </CardDescription>
-                    </div>
+          {categories.map((category) => {
+            const categoryPages = filteredPages.filter((page) => page.category === category.id)
+            if (categoryPages.length === 0) return null
+
+            return (
+              <div key={category.id}>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className={`p-3 rounded-xl bg-gradient-to-r ${category.color} text-white shadow-lg`}>
+                    {category.icon}
                   </div>
-                  <Badge className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-                    {categoryData.pages.filter((page) => page.status === "live").length} Live
-                  </Badge>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-800">{category.name}</h2>
+                    <p className="text-gray-600">{categoryPages.length} pagina's</p>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-gray-100">
-                  {categoryData.pages.map((page, index) => (
-                    <div
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {categoryPages.map((page, index) => (
+                    <Card
                       key={index}
-                      className="p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200"
+                      className="hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border-0 bg-white/90 backdrop-blur-sm shadow-xl"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-gray-900 text-lg">{page.title}</h3>
-                            <Badge className={`${getStatusColor(page.status)} px-2 py-1 rounded-full text-xs`}>
-                              {page.status}
-                            </Badge>
-                            <Badge className={`${getAccessColor(page.access)} px-2 py-1 rounded-full text-xs`}>
-                              {page.access}
+                      <CardHeader className="pb-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            {page.icon}
+                            <CardTitle className="text-lg">{page.title}</CardTitle>
+                          </div>
+                          <div className="flex gap-2">
+                            <Badge className={`${getStatusColor(page.status)} px-2 py-1 text-xs`}>
+                              {getStatusIcon(page.status)}
+                              <span className="ml-1 capitalize">{page.status}</span>
                             </Badge>
                           </div>
-                          <p className="text-gray-600 mb-2">{page.description}</p>
-                          <code className="text-sm bg-gray-100 px-2 py-1 rounded text-gray-700 font-mono">
-                            {page.path}
-                          </code>
                         </div>
-                        <div className="flex items-center gap-3 ml-6">
-                          {page.status === "live" && (
-                            <Link href={page.path}>
-                              <Button
-                                size="sm"
-                                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl"
-                              >
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                Bezoek
+                        <CardDescription className="text-sm leading-relaxed">{page.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-500">Route:</span>
+                            <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{page.path}</code>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <Badge
+                              variant="outline"
+                              className={`${getAccessLevelColor(page.accessLevel)} text-xs px-2 py-1`}
+                            >
+                              {page.accessLevel}
+                            </Badge>
+                            {page.status === "live" && !page.path.includes("[") ? (
+                              <Link href={page.path}>
+                                <Button
+                                  size="sm"
+                                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  Bezoek
+                                </Button>
+                              </Link>
+                            ) : (
+                              <Button size="sm" variant="outline" disabled>
+                                {page.path.includes("[") ? "Dynamic" : "Niet Live"}
                               </Button>
-                            </Link>
-                          )}
-                          <ChevronRight className="h-5 w-5 text-gray-400" />
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            )
+          })}
         </div>
 
-        {/* No Results */}
-        {Object.keys(filteredData).length === 0 && (
+        {filteredPages.length === 0 && (
           <div className="text-center py-16">
             <Search className="h-20 w-20 text-gray-300 mx-auto mb-6" />
             <h3 className="text-2xl font-semibold text-gray-600 mb-3">Geen pagina's gevonden</h3>
-            <p className="text-gray-500 mb-6 text-lg">Probeer je zoekterm of filter aan te passen</p>
+            <p className="text-gray-500 mb-6">Probeer je zoekterm of filters aan te passen</p>
             <Button
               onClick={() => {
                 setSearchTerm("")
-                setSelectedCategory("all")
+                setStatusFilter("all")
+                setCategoryFilter("all")
               }}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300"
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
             >
               Reset Filters
             </Button>
           </div>
         )}
-
-        {/* Footer Info */}
-        <div className="mt-16 text-center">
-          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-0 shadow-lg rounded-3xl">
-            <CardContent className="p-8">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">AI Travel Studio Platform</h3>
-              <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-                Een complete suite van AI-tools en functionaliteiten voor reisagenten. Van content generatie tot booking
-                management, alles wat je nodig hebt om je reisbusiness te digitaliseren en automatiseren.
-              </p>
-              <div className="flex justify-center gap-4">
-                <Link href="/agent-dashboard">
-                  <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300">
-                    <User className="h-4 w-4 mr-2" />
-                    Agent Dashboard
-                  </Button>
-                </Link>
-                <Link href="/admin/control-center">
-                  <Button
-                    variant="outline"
-                    className="rounded-xl px-6 py-3 bg-white/80 backdrop-blur-sm border-gray-200 hover:shadow-lg transition-all duration-300"
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Control Center
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   )
