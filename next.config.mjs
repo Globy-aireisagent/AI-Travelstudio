@@ -1,10 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    // Expose environment variable status to client-side for testing
-    NEXT_PUBLIC_HAS_TC_USERNAME: process.env.TRAVEL_COMPOSITOR_USERNAME ? 'true' : 'false',
-    NEXT_PUBLIC_HAS_TC_PASSWORD: process.env.TRAVEL_COMPOSITOR_PASSWORD ? 'true' : 'false',
-    NEXT_PUBLIC_HAS_TC_MICROSITE: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID ? 'true' : 'false',
+  experimental: {
+    serverComponentsExternalPackages: ['@neondatabase/serverless']
   },
   eslint: {
     ignoreDuringBuilds: true,
@@ -13,8 +10,17 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['placeholder.svg'],
+    domains: ['images.unsplash.com', 'via.placeholder.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
     unoptimized: true,
+  },
+  env: {
+    CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
 }
 

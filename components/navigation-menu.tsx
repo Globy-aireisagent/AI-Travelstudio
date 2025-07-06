@@ -65,10 +65,10 @@ export default function NavigationMenu() {
       badge: "Import",
     },
     {
-      title: "Super Admin",
-      href: "/super-admin",
+      title: "Control Center",
+      href: "/admin/control-center",
       icon: Shield,
-      badge: "Super",
+      badge: "Control",
     },
     {
       title: "Chat Demo",

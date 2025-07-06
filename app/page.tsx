@@ -82,7 +82,10 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/agent-dashboard">
-                <Button variant="outline" className="rounded-xl shadow-sm hover:shadow-md transition-all">
+                <Button
+                  variant="outline"
+                  className="rounded-xl shadow-sm hover:shadow-md transition-all bg-transparent"
+                >
                   Inloggen
                 </Button>
               </Link>
@@ -130,7 +133,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="text-xl px-10 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1"
+                  className="text-xl px-10 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1 bg-transparent"
                 >
                   📺 Bekijk Demo (2 min)
                 </Button>
@@ -373,7 +376,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="text-xl px-10 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1"
+                  className="text-xl px-10 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1 bg-transparent"
                 >
                   📞 Bel Ons (Gratis)
                 </Button>
