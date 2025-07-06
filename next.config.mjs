@@ -1,24 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
-
-  /*--------------------------------------------------------------------
-   |  Build-time relaxations – remove these when your codebase is green |
-   *-------------------------------------------------------------------*/
+  env: {
+    NEXT_PUBLIC_HAS_TC_USERNAME: process.env.TRAVEL_COMPOSITOR_USERNAME ? 'true' : 'false',
+    NEXT_PUBLIC_HAS_TC_PASSWORD: process.env.TRAVEL_COMPOSITOR_PASSWORD ? 'true' : 'false',
+    NEXT_PUBLIC_HAS_TC_MICROSITE: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID ? 'true' : 'false',
+  },
   eslint: {
-    // Allow the build to succeed even with ESLint errors.
     ignoreDuringBuilds: true,
   },
   typescript: {
-    // Allow the build to succeed even with TS type-errors.
     ignoreBuildErrors: true,
   },
-
-  /*------------------------------------------------------------
-   |  Images – Next.js on v0 cannot run the default optimiser |
-   *-----------------------------------------------------------*/
   images: {
+    domains: ['placeholder.svg'],
     unoptimized: true,
   },
 }
