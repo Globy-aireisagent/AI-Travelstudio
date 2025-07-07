@@ -1,138 +1,119 @@
 "use client"
 
+import { CardDescription } from "@/components/ui/card"
+
 import { useState, useEffect } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import dynamic from "next/dynamic"
 import {
   Activity,
   Users,
-  FileText,
-  Settings,
-  BarChart3,
-  Shield,
   Database,
-  Server,
-  Zap,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
+  Settings,
   TrendingUp,
+  AlertTriangle,
+  CheckCircle,
   Clock,
-  Globe,
+  Zap,
+  Shield,
+  RefreshCw,
+  Download,
+  Search,
+  BarChart3,
+  Server,
+  Cpu,
+  HardDrive,
+  Wifi,
 } from "lucide-react"
-import FeatureManagementDashboard from "@/components/feature-management-dashboard"
+
+const FeatureManagementDashboard = dynamic(() => import("@/components/feature-management-dashboard"), { ssr: false })
 
 interface SystemStats {
   totalUsers: number
-  activeBookings: number
-  totalFeatureRequests: number
+  totalBookings: number
+  totalFeatures: number
   systemHealth: "healthy" | "warning" | "critical"
-  uptime: string
-  responseTime: number
+  apiResponseTime: number
+  databaseStatus: "connected" | "disconnected"
+  lastBackup: string
 }
 
-interface SystemMetric {
-  name: string
-  value: number
-  unit: string
-  status: "good" | "warning" | "critical"
-  trend: "up" | "down" | "stable"
-}
-
-export default function AdminControlCenter() {
-  const [activeTab, setActiveTab] = useState("overview")
-  const [systemStats, setSystemStats] = useState<SystemStats>({
+const SuperAdminControlCenter = () => {
+  const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
-    activeBookings: 0,
-    totalFeatureRequests: 0,
+    totalBookings: 0,
+    totalFeatures: 0,
     systemHealth: "healthy",
-    uptime: "0h 0m",
-    responseTime: 0,
+    apiResponseTime: 0,
+    databaseStatus: "connected",
+    lastBackup: new Date().toISOString(),
   })
-  const [systemMetrics, setSystemMetrics] = useState<SystemMetric[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("overview")
 
   useEffect(() => {
-    loadSystemData()
-    const interval = setInterval(loadSystemData, 30000) // Update every 30 seconds
-    return () => clearInterval(interval)
+    loadSystemStats()
   }, [])
 
-  const loadSystemData = async () => {
+  const loadSystemStats = async () => {
     try {
-      // Simulate loading system data
-      setSystemStats({
-        totalUsers: 1247,
-        activeBookings: 89,
-        totalFeatureRequests: 23,
+      // Simulate loading system stats
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      setStats({
+        totalUsers: 247,
+        totalBookings: 1834,
+        totalFeatures: 23,
         systemHealth: "healthy",
-        uptime: "7d 14h 32m",
-        responseTime: 245,
+        apiResponseTime: 145,
+        databaseStatus: "connected",
+        lastBackup: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
       })
-
-      setSystemMetrics([
-        { name: "CPU Usage", value: 23, unit: "%", status: "good", trend: "stable" },
-        { name: "Memory Usage", value: 67, unit: "%", status: "warning", trend: "up" },
-        { name: "Disk Usage", value: 45, unit: "%", status: "good", trend: "stable" },
-        { name: "API Response Time", value: 245, unit: "ms", status: "good", trend: "down" },
-        { name: "Database Connections", value: 12, unit: "", status: "good", trend: "stable" },
-        { name: "Active Sessions", value: 34, unit: "", status: "good", trend: "up" },
-      ])
-
-      setLastUpdate(new Date())
-      setIsLoading(false)
     } catch (error) {
-      console.error("Failed to load system data:", error)
-      setIsLoading(false)
+      console.error("Error loading system stats:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
   const getHealthColor = (health: string) => {
     switch (health) {
       case "healthy":
-        return "text-green-600 bg-green-100"
+        return "text-green-600"
       case "warning":
-        return "text-yellow-600 bg-yellow-100"
+        return "text-yellow-600"
       case "critical":
-        return "text-red-600 bg-red-100"
+        return "text-red-600"
       default:
-        return "text-gray-600 bg-gray-100"
+        return "text-gray-600"
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "good":
-        return <CheckCircle className="w-4 h-4 text-green-600" />
+  const getHealthIcon = (health: string) => {
+    switch (health) {
+      case "healthy":
+        return <CheckCircle className="h-5 w-5 text-green-600" />
       case "warning":
-        return <AlertTriangle className="w-4 h-4 text-yellow-600" />
+        return <AlertTriangle className="h-5 w-5 text-yellow-600" />
       case "critical":
-        return <XCircle className="w-4 h-4 text-red-600" />
+        return <AlertTriangle className="h-5 w-5 text-red-600" />
       default:
-        return <Activity className="w-4 h-4 text-gray-600" />
+        return <Clock className="h-5 w-5 text-gray-600" />
     }
   }
 
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case "up":
-        return <TrendingUp className="w-3 h-3 text-green-600" />
-      case "down":
-        return <TrendingUp className="w-3 h-3 text-red-600 rotate-180" />
-      default:
-        return <Activity className="w-3 h-3 text-gray-600" />
-    }
-  }
-
-  const performSystemAction = async (action: string) => {
-    console.log(`Performing system action: ${action}`)
-    // Simulate system action
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    alert(`${action} completed successfully!`)
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Super Admin Control Center...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -140,57 +121,66 @@ export default function AdminControlCenter() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-            <Shield className="w-8 h-8 text-blue-600" />
-            Admin Control Center
-          </h1>
-          <p className="text-gray-600">Complete system management and monitoring dashboard</p>
-          <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-            <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
-            <Badge className={getHealthColor(systemStats.systemHealth)}>{systemStats.systemHealth.toUpperCase()}</Badge>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Super Admin Control Center</h1>
+              <p className="text-gray-600 mt-1">Complete system management and monitoring dashboard</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Badge variant="outline" className="flex items-center gap-1">
+                {getHealthIcon(stats.systemHealth)}
+                System {stats.systemHealth}
+              </Badge>
+              <Button variant="outline" size="sm" onClick={loadSystemStats}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Refresh
+              </Button>
+            </div>
           </div>
         </div>
 
+        {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Activity className="w-4 h-4" />
+              <BarChart3 className="h-4 w-4" />
               Overview
             </TabsTrigger>
             <TabsTrigger value="features" className="flex items-center gap-2">
-              <Zap className="w-4 h-4" />
+              <Zap className="h-4 w-4" />
               Features
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
+              <Users className="h-4 w-4" />
               Users
             </TabsTrigger>
             <TabsTrigger value="bookings" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
+              <Database className="h-4 w-4" />
               Bookings
             </TabsTrigger>
             <TabsTrigger value="system" className="flex items-center gap-2">
-              <Settings className="w-4 h-4" />
+              <Settings className="h-4 w-4" />
               System
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
+              <TrendingUp className="h-4 w-4" />
               Analytics
             </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* System Stats Cards */}
+            {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Total Users</p>
-                      <p className="text-2xl font-bold text-gray-900">{systemStats.totalUsers.toLocaleString()}</p>
+                      <p className="text-3xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</p>
+                      <p className="text-sm text-green-600 mt-1">↗ +12% from last month</p>
                     </div>
-                    <Users className="w-8 h-8 text-blue-600" />
+                    <Users className="h-8 w-8 text-blue-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -199,10 +189,11 @@ export default function AdminControlCenter() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Active Bookings</p>
-                      <p className="text-2xl font-bold text-gray-900">{systemStats.activeBookings}</p>
+                      <p className="text-sm font-medium text-gray-600">Total Bookings</p>
+                      <p className="text-3xl font-bold text-gray-900">{stats.totalBookings.toLocaleString()}</p>
+                      <p className="text-sm text-green-600 mt-1">↗ +8% from last month</p>
                     </div>
-                    <FileText className="w-8 h-8 text-green-600" />
+                    <Database className="h-8 w-8 text-green-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -212,9 +203,10 @@ export default function AdminControlCenter() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Feature Requests</p>
-                      <p className="text-2xl font-bold text-gray-900">{systemStats.totalFeatureRequests}</p>
+                      <p className="text-3xl font-bold text-gray-900">{stats.totalFeatures}</p>
+                      <p className="text-sm text-blue-600 mt-1">5 pending review</p>
                     </div>
-                    <Zap className="w-8 h-8 text-purple-600" />
+                    <Zap className="h-8 w-8 text-purple-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -223,10 +215,11 @@ export default function AdminControlCenter() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">System Uptime</p>
-                      <p className="text-2xl font-bold text-gray-900">{systemStats.uptime}</p>
+                      <p className="text-sm font-medium text-gray-600">API Response</p>
+                      <p className="text-3xl font-bold text-gray-900">{stats.apiResponseTime}ms</p>
+                      <p className="text-sm text-green-600 mt-1">Excellent performance</p>
                     </div>
-                    <Clock className="w-8 h-8 text-orange-600" />
+                    <Activity className="h-8 w-8 text-orange-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -237,71 +230,84 @@ export default function AdminControlCenter() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Server className="w-5 h-5" />
+                    <Server className="h-5 w-5" />
                     System Health
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {systemMetrics.map((metric, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        {getStatusIcon(metric.status)}
-                        <div>
-                          <p className="font-medium">{metric.name}</p>
-                          <p className="text-sm text-gray-600">
-                            {metric.value}
-                            {metric.unit}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getTrendIcon(metric.trend)}
-                        <Badge variant={metric.status === "good" ? "default" : "destructive"}>{metric.status}</Badge>
-                      </div>
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <span className="font-medium">Database Connection</span>
                     </div>
-                  ))}
+                    <Badge variant="outline" className="text-green-600 border-green-600">
+                      Connected
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <span className="font-medium">API Services</span>
+                    </div>
+                    <Badge variant="outline" className="text-green-600 border-green-600">
+                      Operational
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <span className="font-medium">Travel Compositor</span>
+                    </div>
+                    <Badge variant="outline" className="text-green-600 border-green-600">
+                      Connected
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Cpu className="h-5 w-5 text-blue-600" />
+                      <span className="font-medium">Server Load</span>
+                    </div>
+                    <Badge variant="outline" className="text-blue-600 border-blue-600">
+                      23% CPU
+                    </Badge>
+                  </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Activity className="w-5 h-5" />
+                    <Shield className="h-5 w-5" />
                     Quick Actions
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button
-                    onClick={() => performSystemAction("Database Backup")}
-                    className="w-full justify-start"
-                    variant="outline"
-                  >
-                    <Database className="w-4 h-4 mr-2" />
+                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
                     Create Database Backup
                   </Button>
-                  <Button
-                    onClick={() => performSystemAction("Clear Cache")}
-                    className="w-full justify-start"
-                    variant="outline"
-                  >
-                    <Zap className="w-4 h-4 mr-2" />
+
+                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                    <RefreshCw className="h-4 w-4 mr-2" />
                     Clear System Cache
                   </Button>
-                  <Button
-                    onClick={() => performSystemAction("Security Scan")}
-                    className="w-full justify-start"
-                    variant="outline"
-                  >
-                    <Shield className="w-4 h-4 mr-2" />
+
+                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                    <Shield className="h-4 w-4 mr-2" />
                     Run Security Scan
                   </Button>
-                  <Button
-                    onClick={() => performSystemAction("System Optimization")}
-                    className="w-full justify-start"
-                    variant="outline"
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Optimize System
+
+                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Generate Analytics Report
+                  </Button>
+
+                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                    <Settings className="h-4 w-4 mr-2" />
+                    System Optimization
                   </Button>
                 </CardContent>
               </Card>
@@ -311,38 +317,43 @@ export default function AdminControlCenter() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Activity className="w-5 h-5" />
-                  Recent Activity
+                  <Activity className="h-5 w-5" />
+                  Recent System Activity
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {[
-                    { action: "New user registration", user: "john@example.com", time: "2 minutes ago", type: "user" },
-                    { action: "Booking created", user: "RRP-9571", time: "5 minutes ago", type: "booking" },
-                    {
-                      action: "Feature request submitted",
-                      user: "AI Chat Integration",
-                      time: "12 minutes ago",
-                      type: "feature",
-                    },
-                    { action: "System backup completed", user: "System", time: "1 hour ago", type: "system" },
-                    { action: "Database optimization", user: "System", time: "3 hours ago", type: "system" },
-                  ].map((activity, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        {activity.type === "user" && <Users className="w-4 h-4 text-blue-600" />}
-                        {activity.type === "booking" && <FileText className="w-4 h-4 text-green-600" />}
-                        {activity.type === "feature" && <Zap className="w-4 h-4 text-purple-600" />}
-                        {activity.type === "system" && <Settings className="w-4 h-4 text-orange-600" />}
-                        <div>
-                          <p className="font-medium">{activity.action}</p>
-                          <p className="text-sm text-gray-600">{activity.user}</p>
-                        </div>
-                      </div>
-                      <span className="text-sm text-gray-500">{activity.time}</span>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Database backup completed successfully</p>
+                      <p className="text-xs text-gray-500">2 hours ago</p>
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Users className="h-4 w-4 text-blue-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">15 new users registered today</p>
+                      <p className="text-xs text-gray-500">4 hours ago</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Zap className="h-4 w-4 text-purple-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">New feature request: "Advanced booking filters"</p>
+                      <p className="text-xs text-gray-500">6 hours ago</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Database className="h-4 w-4 text-green-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Travel Compositor sync completed - 47 bookings updated</p>
+                      <p className="text-xs text-gray-500">8 hours ago</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -357,47 +368,63 @@ export default function AdminControlCenter() {
           <TabsContent value="users" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  User Management
-                </CardTitle>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>Manage system users and permissions</CardDescription>
               </CardHeader>
               <CardContent>
-                <Alert>
-                  <AlertTriangle className="w-4 h-4" />
-                  <AlertDescription>
-                    User management interface coming soon. For now, users can be managed through the database directly.
-                  </AlertDescription>
-                </Alert>
+                <div className="text-center py-12">
+                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">User Management Coming Soon</h3>
+                  <p className="text-gray-600 mb-4">Advanced user management features are in development</p>
+                  <Button variant="outline">
+                    <Search className="h-4 w-4 mr-2" />
+                    View Current Users
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Bookings Tab */}
           <TabsContent value="bookings" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <FileText className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Active Bookings</h3>
-                  <p className="text-3xl font-bold text-green-600">89</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <Clock className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Pending</h3>
-                  <p className="text-3xl font-bold text-yellow-600">12</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <CheckCircle className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Completed</h3>
-                  <p className="text-3xl font-bold text-blue-600">1,247</p>
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Booking Management</CardTitle>
+                <CardDescription>Monitor and manage travel bookings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-900">Active Bookings</h4>
+                    <p className="text-2xl font-bold text-blue-600">1,247</p>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-green-900">Completed Today</h4>
+                    <p className="text-2xl font-bold text-green-600">23</p>
+                  </div>
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-yellow-900">Pending Review</h4>
+                    <p className="text-2xl font-bold text-yellow-600">8</p>
+                  </div>
+                </div>
+
+                <div className="text-center py-8">
+                  <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Advanced Booking Management</h3>
+                  <p className="text-gray-600 mb-4">Detailed booking analytics and management tools</p>
+                  <div className="flex gap-2 justify-center">
+                    <Button variant="outline">
+                      <Search className="h-4 w-4 mr-2" />
+                      Search Bookings
+                    </Button>
+                    <Button variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Data
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* System Tab */}
@@ -405,51 +432,63 @@ export default function AdminControlCenter() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="w-5 h-5" />
-                    System Configuration
-                  </CardTitle>
+                  <CardTitle>System Configuration</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Environment</label>
-                    <Badge>Production</Badge>
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">Environment</p>
+                      <p className="text-sm text-gray-600">Production</p>
+                    </div>
+                    <Badge variant="outline" className="text-green-600 border-green-600">
+                      Live
+                    </Badge>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Version</label>
-                    <p className="text-sm">v2.1.0</p>
+
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">Database Version</p>
+                      <p className="text-sm text-gray-600">PostgreSQL 15.2</p>
+                    </div>
+                    <Badge variant="outline">Latest</Badge>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Last Deployment</label>
-                    <p className="text-sm">2024-01-15 14:30:00 UTC</p>
+
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">Last Backup</p>
+                      <p className="text-sm text-gray-600">{new Date(stats.lastBackup).toLocaleString()}</p>
+                    </div>
+                    <Badge variant="outline" className="text-green-600 border-green-600">
+                      Recent
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="w-5 h-5" />
-                    Database Status
-                  </CardTitle>
+                  <CardTitle>System Maintenance</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span>Connection Status</span>
-                    <Badge className="bg-green-100 text-green-800">Connected</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Active Connections</span>
-                    <span>12/100</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Database Size</span>
-                    <span>2.4 GB</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Last Backup</span>
-                    <span>2 hours ago</span>
-                  </div>
+                <CardContent className="space-y-3">
+                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Restart Services
+                  </Button>
+
+                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Logs
+                  </Button>
+
+                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                    <HardDrive className="h-4 w-4 mr-2" />
+                    Disk Cleanup
+                  </Button>
+
+                  <Button className="w-full justify-start bg-transparent" variant="outline">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Update Configuration
+                  </Button>
                 </CardContent>
               </Card>
             </div>
@@ -457,43 +496,66 @@ export default function AdminControlCenter() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <Globe className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Page Views</h3>
-                  <p className="text-3xl font-bold text-blue-600">24,891</p>
-                  <p className="text-sm text-gray-600">+12% from last month</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <Users className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Active Users</h3>
-                  <p className="text-3xl font-bold text-green-600">1,247</p>
-                  <p className="text-sm text-gray-600">+8% from last month</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <TrendingUp className="w-12 h-12 text-purple-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Conversion Rate</h3>
-                  <p className="text-3xl font-bold text-purple-600">3.2%</p>
-                  <p className="text-sm text-gray-600">+0.5% from last month</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <BarChart3 className="w-12 h-12 text-orange-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Revenue</h3>
-                  <p className="text-3xl font-bold text-orange-600">€89,234</p>
-                  <p className="text-sm text-gray-600">+15% from last month</p>
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>System Analytics</CardTitle>
+                <CardDescription>Performance metrics and usage statistics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Wifi className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-900">API Calls</span>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600">12,847</p>
+                    <p className="text-xs text-blue-600">Today</p>
+                  </div>
+
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-900">Success Rate</span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-600">99.2%</p>
+                    <p className="text-xs text-green-600">Last 24h</p>
+                  </div>
+
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="h-4 w-4 text-purple-600" />
+                      <span className="text-sm font-medium text-purple-900">Active Users</span>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-600">1,234</p>
+                    <p className="text-xs text-purple-600">Right now</p>
+                  </div>
+
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm font-medium text-orange-900">Avg Response</span>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-600">{stats.apiResponseTime}ms</p>
+                    <p className="text-xs text-orange-600">Last hour</p>
+                  </div>
+                </div>
+
+                <div className="text-center py-8">
+                  <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Advanced Analytics Dashboard</h3>
+                  <p className="text-gray-600 mb-4">Detailed charts and insights coming soon</p>
+                  <Button variant="outline">
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    View Full Analytics
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
     </div>
   )
 }
+
+export default SuperAdminControlCenter
