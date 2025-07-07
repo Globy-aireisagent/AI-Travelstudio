@@ -40,36 +40,36 @@ export default function ImportPage() {
       title: "Travel Compositor",
       description: "Booking ID of RRP nummer",
       icon: <CheckCircle className="h-8 w-8" />,
-      color: "border-blue-300 bg-blue-50",
+      color: "border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100",
       badge: "Aanbevolen",
-      badgeColor: "bg-blue-100 text-blue-700",
+      badgeColor: "bg-gradient-to-r from-blue-500 to-blue-600 text-white",
     },
     {
       id: "url-import",
       title: "URL Import",
       description: "Importeer van website",
       icon: <Globe className="h-8 w-8" />,
-      color: "border-green-300 bg-green-50",
+      color: "border-green-300 bg-gradient-to-br from-green-50 to-green-100",
       badge: "Betrouwbaar",
-      badgeColor: "bg-green-100 text-green-700",
+      badgeColor: "bg-gradient-to-r from-green-500 to-green-600 text-white",
     },
     {
       id: "pdf-document",
       title: "PDF Document",
       description: "Upload reisdocument",
       icon: <FileText className="h-8 w-8" />,
-      color: "border-orange-300 bg-orange-50",
+      color: "border-orange-300 bg-gradient-to-br from-orange-50 to-orange-100",
       badge: "Experimenteel",
-      badgeColor: "bg-orange-100 text-orange-700",
+      badgeColor: "bg-gradient-to-r from-orange-500 to-orange-600 text-white",
     },
     {
       id: "manual-input",
       title: "Handmatige Invoer",
       description: "Typ reisgegevens in",
       icon: <Edit className="h-8 w-8" />,
-      color: "border-gray-300 bg-gray-50",
+      color: "border-gray-300 bg-gradient-to-br from-gray-50 to-gray-100",
       badge: "Handmatig",
-      badgeColor: "bg-gray-100 text-gray-700",
+      badgeColor: "bg-gradient-to-r from-gray-500 to-gray-600 text-white",
     },
   ]
 
@@ -238,13 +238,6 @@ export default function ImportPage() {
       }
     })()
 
-    console.log("🔍 canImport check:", {
-      selectedImportType,
-      travelCompositorType,
-      bookingId: bookingId.trim(),
-      result,
-    })
-
     return result
   }
 
@@ -271,7 +264,7 @@ export default function ImportPage() {
                 Import Tool
               </Badge>
               <Link href="/agent-dashboard">
-                <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 px-6 py-3">
+                <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 px-6 py-3 transform hover:scale-105">
                   <Home className="w-4 h-4 mr-2" />🏠 Agent HQ
                 </Button>
               </Link>
@@ -293,57 +286,32 @@ export default function ImportPage() {
               {importTypes.map((type) => (
                 <Card
                   key={type.id}
-                  className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                  className={`cursor-pointer transition-all duration-300 hover:shadow-xl transform hover:-translate-y-2 hover:scale-105 ${
                     selectedImportType === type.id
-                      ? `${type.color} border-2 shadow-lg`
-                      : "border border-gray-200 hover:border-gray-300"
+                      ? `${type.color} border-2 shadow-2xl ring-4 ring-blue-200`
+                      : "border border-gray-200 hover:border-gray-300 bg-white/80 backdrop-blur-sm"
                   }`}
                   onClick={() => setSelectedImportType(type.id)}
                 >
                   <CardContent className="p-6 text-center">
-                    <div className="flex justify-center mb-4 text-gray-600">{type.icon}</div>
+                    <div className="flex justify-center mb-4 text-gray-600 transform transition-transform duration-300 hover:scale-110">
+                      {type.icon}
+                    </div>
                     <h3 className="font-semibold text-lg mb-2">{type.title}</h3>
                     <p className="text-sm text-gray-600 mb-3">{type.description}</p>
-                    <Badge className={`text-xs ${type.badgeColor}`}>{type.badge}</Badge>
+                    <Badge className={`text-xs ${type.badgeColor} shadow-lg`}>{type.badge}</Badge>
                   </CardContent>
                 </Card>
               ))}
             </div>
           </div>
 
-          {/* Debug Info */}
-          <div className="mb-4 p-4 bg-green-100 rounded-lg text-sm">
-            <strong>✅ Travel Compositor Status:</strong>
-            <br />
-            Connection: Working ✅
-            <br />
-            Test Booking (RRP-9263): Found in rondreis-planner ✅
-            <br />
-            Available Microsites: 4 configured, 2 active
-          </div>
-
-          <div className="mb-4 p-4 bg-gray-100 rounded-lg text-sm">
-            <strong>🐛 Debug Info:</strong>
-            <br />
-            Selected Type: {selectedImportType}
-            <br />
-            TC Type: {travelCompositorType}
-            <br />
-            Booking ID: "{bookingId}"
-            <br />
-            Microsite: {selectedMicrosite}
-            <br />
-            Can Import: {canImport() ? "✅ YES" : "❌ NO"}
-            <br />
-            Is Importing: {isImporting ? "✅ YES" : "❌ NO"}
-          </div>
-
           {/* Success Message */}
           {importSuccess && (
-            <Card className="mb-6 border-green-200 bg-green-50">
+            <Card className="mb-6 border-green-200 bg-gradient-to-r from-green-50 to-green-100 shadow-xl">
               <CardContent className="p-4">
                 <div className="flex items-center text-green-700">
-                  <CheckCircle className="h-5 w-5 mr-2" />
+                  <CheckCircle className="h-5 w-5 mr-2 animate-pulse" />
                   <div>
                     <p className="font-medium">Import Succesvol!</p>
                     <p className="text-sm">{importSuccess}</p>
@@ -356,10 +324,10 @@ export default function ImportPage() {
 
           {/* Error Display */}
           {importError && (
-            <Card className="mb-6 border-red-200 bg-red-50">
+            <Card className="mb-6 border-red-200 bg-gradient-to-r from-red-50 to-red-100 shadow-xl">
               <CardContent className="p-4">
                 <div className="flex items-center text-red-700">
-                  <AlertCircle className="h-5 w-5 mr-2" />
+                  <AlertCircle className="h-5 w-5 mr-2 animate-bounce" />
                   <div>
                     <p className="font-medium">Import Fout</p>
                     <p className="text-sm">{importError}</p>
@@ -371,10 +339,12 @@ export default function ImportPage() {
 
           {/* Input Form */}
           {selectedImportType && (
-            <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg">
+            <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm transform transition-all duration-300 hover:shadow-3xl">
+              <CardHeader className="bg-gradient-to-r from-blue-500 via-purple-600 to-blue-500 text-white rounded-t-lg bg-size-200 animate-gradient">
                 <CardTitle className="text-xl flex items-center">
-                  {importTypes.find((t) => t.id === selectedImportType)?.icon}
+                  <div className="transform transition-transform duration-300 hover:rotate-12">
+                    {importTypes.find((t) => t.id === selectedImportType)?.icon}
+                  </div>
                   <span className="ml-3">{importTypes.find((t) => t.id === selectedImportType)?.title}</span>
                 </CardTitle>
               </CardHeader>
@@ -389,50 +359,56 @@ export default function ImportPage() {
                         </label>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <Card
-                            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                            className={`cursor-pointer transition-all duration-300 hover:shadow-xl transform hover:-translate-y-2 hover:scale-105 ${
                               travelCompositorType === "booking"
-                                ? "border-blue-300 bg-blue-50 border-2 shadow-lg"
-                                : "border border-gray-200 hover:border-gray-300"
+                                ? "border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100 border-2 shadow-2xl ring-4 ring-blue-200"
+                                : "border border-gray-200 hover:border-gray-300 bg-white/80 backdrop-blur-sm"
                             }`}
                             onClick={() => setTravelCompositorType("booking")}
                           >
                             <CardContent className="p-4 text-center">
-                              <CheckCircle className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                              <CheckCircle className="h-8 w-8 text-blue-600 mx-auto mb-2 transform transition-transform duration-300 hover:scale-110" />
                               <h3 className="font-semibold text-lg mb-1">Booking</h3>
                               <p className="text-sm text-gray-600">Volledige boeking</p>
-                              <Badge className="bg-blue-100 text-blue-700 text-xs mt-2">Meest gebruikt</Badge>
+                              <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs mt-2 shadow-lg">
+                                Roadbooks & Vouchers
+                              </Badge>
                             </CardContent>
                           </Card>
 
                           <Card
-                            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                            className={`cursor-pointer transition-all duration-300 hover:shadow-xl transform hover:-translate-y-2 hover:scale-105 ${
                               travelCompositorType === "travel-idea"
-                                ? "border-green-300 bg-green-50 border-2 shadow-lg"
-                                : "border border-gray-200 hover:border-gray-300"
+                                ? "border-green-300 bg-gradient-to-br from-green-50 to-green-100 border-2 shadow-2xl ring-4 ring-green-200"
+                                : "border border-gray-200 hover:border-gray-300 bg-white/80 backdrop-blur-sm"
                             }`}
                             onClick={() => setTravelCompositorType("travel-idea")}
                           >
                             <CardContent className="p-4 text-center">
-                              <Globe className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                              <Globe className="h-8 w-8 text-green-600 mx-auto mb-2 transform transition-transform duration-300 hover:scale-110" />
                               <h3 className="font-semibold text-lg mb-1">Travel Idea</h3>
                               <p className="text-sm text-gray-600">Reis inspiratie</p>
-                              <Badge className="bg-green-100 text-green-700 text-xs mt-2">Populair</Badge>
+                              <Badge className="bg-gradient-to-r from-green-500 to-green-600 text-white text-xs mt-2 shadow-lg">
+                                Offertes & Media
+                              </Badge>
                             </CardContent>
                           </Card>
 
                           <Card
-                            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                            className={`cursor-pointer transition-all duration-300 hover:shadow-xl transform hover:-translate-y-2 hover:scale-105 ${
                               travelCompositorType === "holiday-package"
-                                ? "border-purple-300 bg-purple-50 border-2 shadow-lg"
-                                : "border border-gray-200 hover:border-gray-300"
+                                ? "border-purple-300 bg-gradient-to-br from-purple-50 to-purple-100 border-2 shadow-2xl ring-4 ring-purple-200"
+                                : "border border-gray-200 hover:border-gray-300 bg-white/80 backdrop-blur-sm"
                             }`}
                             onClick={() => setTravelCompositorType("holiday-package")}
                           >
                             <CardContent className="p-4 text-center">
-                              <FileText className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                              <FileText className="h-8 w-8 text-purple-600 mx-auto mb-2 transform transition-transform duration-300 hover:scale-110" />
                               <h3 className="font-semibold text-lg mb-1">Holiday Package</h3>
                               <p className="text-sm text-gray-600">Vakantie pakket</p>
-                              <Badge className="bg-purple-100 text-purple-700 text-xs mt-2">Premium</Badge>
+                              <Badge className="bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs mt-2 shadow-lg">
+                                Offertes & Media
+                              </Badge>
                             </CardContent>
                           </Card>
                         </div>
@@ -451,14 +427,8 @@ export default function ImportPage() {
                             <Input
                               value={bookingId}
                               onChange={(e) => setBookingId(e.target.value)}
-                              placeholder={
-                                travelCompositorType === "booking"
-                                  ? "Bijv. RRP-9488, RRP-9487, RRP-9486 (recent bookings)"
-                                  : travelCompositorType === "travel-idea"
-                                    ? "Bijv. IDEA123456, 12345 (travel idea ID)"
-                                    : "Bijv. PKG123456"
-                              }
-                              className="text-lg py-3"
+                              placeholder={travelCompositorType === "booking" ? "RRP-9488" : "3000936"}
+                              className="text-lg py-3 border-2 focus:border-blue-500 focus:ring-4 focus:ring-blue-200 transition-all duration-300"
                             />
                             <p className="text-sm text-gray-500 mt-2">
                               {travelCompositorType === "booking" &&
@@ -475,14 +445,14 @@ export default function ImportPage() {
                             <select
                               value={selectedMicrosite}
                               onChange={(e) => setSelectedMicrosite(e.target.value)}
-                              className="w-full p-3 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              className="w-full p-3 border-2 border-gray-300 rounded-lg text-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 transition-all duration-300 bg-white/80 backdrop-blur-sm"
                             >
                               <option value="auto">🌍 Automatisch (alle microsites)</option>
-                              {microsites.map((microsite) => (
-                                <option key={microsite.id} value={microsite.id}>
-                                  📍 {microsite.name} ({microsite.code})
-                                </option>
-                              ))}
+                              <option value="1">📍 Rondreis Planner</option>
+                              <option value="2">📍 Blauwe versie</option>
+                              <option value="3">📍 Travel Time</option>
+                              <option value="4">📍 Symphony Travel</option>
+                              <option value="5">📍 Travel Time Europa</option>
                             </select>
                             <p className="text-sm text-gray-500 mt-2">
                               <strong>Aanbevolen:</strong> Automatisch zoekt door alle microsites en vindt je booking
@@ -501,7 +471,7 @@ export default function ImportPage() {
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         placeholder="https://example.com/reis-details"
-                        className="text-lg py-3"
+                        className="text-lg py-3 border-2 focus:border-green-500 focus:ring-4 focus:ring-green-200 transition-all duration-300"
                       />
                       <p className="text-sm text-gray-500 mt-2">Voer de URL in van de website met reisinformatie</p>
                     </div>
@@ -510,7 +480,7 @@ export default function ImportPage() {
                   {selectedImportType === "pdf-document" && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Upload PDF Document:</label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-orange-400 hover:bg-orange-50 transition-all duration-300 transform hover:scale-105">
                         <input
                           type="file"
                           accept=".pdf"
@@ -519,7 +489,7 @@ export default function ImportPage() {
                           id="pdf-upload"
                         />
                         <label htmlFor="pdf-upload" className="cursor-pointer">
-                          <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <FileText className="h-12 w-12 text-orange-400 mx-auto mb-4 transform transition-transform duration-300 hover:scale-110" />
                           <p className="text-lg font-medium text-gray-700">
                             {file ? file.name : "Klik om PDF te uploaden"}
                           </p>
@@ -537,7 +507,7 @@ export default function ImportPage() {
                         onChange={(e) => setManualData(e.target.value)}
                         placeholder="Voer hier je reisgegevens in: bestemming, data, hotels, activiteiten, etc."
                         rows={8}
-                        className="text-lg"
+                        className="text-lg border-2 focus:border-gray-500 focus:ring-4 focus:ring-gray-200 transition-all duration-300"
                       />
                       <p className="text-sm text-gray-500 mt-2">Typ alle relevante reisinformatie in dit veld</p>
                     </div>
@@ -550,7 +520,7 @@ export default function ImportPage() {
                       handleImport()
                     }}
                     disabled={!canImport() || isImporting}
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="w-full bg-gradient-to-r from-blue-500 via-purple-600 to-blue-500 hover:from-blue-600 hover:via-purple-700 hover:to-blue-600 text-white py-4 text-lg font-semibold rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 bg-size-200 animate-gradient disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   >
                     {isImporting ? (
                       <>
@@ -561,7 +531,7 @@ export default function ImportPage() {
                       </>
                     ) : (
                       <>
-                        <Upload className="h-5 w-5 mr-2" />
+                        <Upload className="h-5 w-5 mr-2 transform transition-transform duration-300 group-hover:scale-110" />
                         Importeer Reis
                       </>
                     )}
@@ -569,14 +539,14 @@ export default function ImportPage() {
 
                   {/* Help text */}
                   {selectedImportType === "travel-compositor" && (
-                    <div className="p-4 bg-blue-50 rounded-lg">
+                    <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-lg">
                       <h4 className="font-medium text-blue-800 mb-2">💡 Tips voor Travel Compositor import:</h4>
                       <ul className="text-sm text-blue-700 space-y-1">
                         <li>• Gebruik "Automatisch" voor de beste resultaten</li>
                         <li>• RRP nummers werken met of zonder "RRP-" prefix</li>
                         <li>• Het systeem zoekt automatisch door alle beschikbare microsites</li>
                         <li>• Import duurt meestal 5-15 seconden</li>
-                        <li>• Recente bookings: RRP-9480 tot RRP-9488 beschikbaar</li>
+                        <li>• Recent booking voorbeeld: RRP-9488</li>
                         <li>• Totaal 9488+ bookings in het systeem</li>
                       </ul>
                     </div>
@@ -585,42 +555,6 @@ export default function ImportPage() {
               </CardContent>
             </Card>
           )}
-        </div>
-
-        {/* Debug Test Section */}
-        <div className="mt-8 p-6 bg-gray-100 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">🧪 API Endpoint Tests</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button
-              onClick={() => window.open("/api/authenticated-booking-search?bookingId=RRP-9263", "_blank")}
-              className="bg-blue-500 hover:bg-blue-600 text-white"
-            >
-              Test Authenticated Search
-            </Button>
-            <Button
-              onClick={async () => {
-                try {
-                  const response = await fetch("/api/fast-booking-lookup", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ bookingId: "RRP-9263", micrositeId: null }),
-                  })
-                  const data = await response.json()
-                  console.log("Fast lookup result:", data)
-                  alert("Check console for results!")
-                } catch (error) {
-                  console.error("Error:", error)
-                  alert("Error - check console")
-                }
-              }}
-              className="bg-green-500 hover:bg-green-600 text-white"
-            >
-              Test Fast Lookup
-            </Button>
-          </div>
-          <p className="text-sm text-gray-600 mt-2">
-            Deze buttons testen de API endpoints in jouw eigen app (niet AI-Travel Studio)
-          </p>
         </div>
       </div>
     </div>

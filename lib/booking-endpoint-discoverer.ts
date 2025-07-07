@@ -72,6 +72,20 @@ export class BookingEndpointDiscoverer {
       })
     }
 
+    // Config 4
+    if (
+      process.env.TRAVEL_COMPOSITOR_USERNAME_4 &&
+      process.env.TRAVEL_COMPOSITOR_PASSWORD_4 &&
+      process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_4
+    ) {
+      configs.push({
+        name: "Config 4",
+        username: process.env.TRAVEL_COMPOSITOR_USERNAME_4,
+        password: process.env.TRAVEL_COMPOSITOR_PASSWORD_4,
+        micrositeId: process.env.TRAVEL_COMPOSITOR_MICROSITE_ID_4,
+      })
+    }
+
     return configs
   }
 
@@ -83,11 +97,15 @@ export class BookingEndpointDiscoverer {
       return cached.token
     }
 
-    console.log(`🔐 Authenticating ${config.name} (microsite: ${config.micrositeId})...`)
+    console.log(`🔐 Authenticating ${config.name} (user: ${config.username}, microsite: ${config.micrositeId})...`)
 
     const res = await fetch(`${this.baseUrl}/resources/authentication/authenticate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "TravelAssistant/1.0",
+      },
       body: JSON.stringify({
         username: config.username,
         password: config.password,
@@ -97,6 +115,7 @@ export class BookingEndpointDiscoverer {
 
     if (!res.ok) {
       const text = await res.text()
+      console.error(`❌ Authentication failed for ${config.name}: ${res.status} – ${text}`)
       throw new Error(`Authentication failed for ${config.name}: ${res.status} – ${text}`)
     }
 
@@ -105,7 +124,7 @@ export class BookingEndpointDiscoverer {
     const expiry = Date.now() + (data.expirationInSeconds ?? 7200) * 1000 - 60_000
 
     this.authTokens.set(cacheKey, { token, expiry })
-    console.log(`✅ Authentication successful for ${config.name}`)
+    console.log(`✅ Authentication successful for ${config.name} (expires in ${data.expirationInSeconds}s)`)
 
     return token
   }
@@ -114,7 +133,7 @@ export class BookingEndpointDiscoverer {
     const configs = this.getConfigurations()
 
     if (configs.length === 0) {
-      console.warn("No Travel Compositor configurations found in environment variables")
+      console.warn("❌ No Travel Compositor configurations found in environment variables")
       return {
         workingEndpoints: [],
         failedEndpoints: [],
@@ -147,13 +166,39 @@ export class BookingEndpointDiscoverer {
         })
 
         // Test different endpoint patterns for this microsite
+        // Focus on patterns that are more likely to work with rondreis-planner
         const endpointsToTest = [
+          // Standard booking endpoints
           `/resources/booking/getBookings?microsite=${config.micrositeId}&first=0&limit=50`,
-          `/resources/booking/getBookings?microsite=${config.micrositeId}&from=20250101&to=20251231`,
+          `/resources/booking/getBookings?microsite=${config.micrositeId}&from=20250101&to=20251231&first=0&limit=50`,
+          `/resources/booking/getBookings?microsite=${config.micrositeId}`,
+
+          // Alternative patterns
           `/resources/booking/${config.micrositeId}`,
           `/resources/booking/${config.micrositeId}?first=0&limit=50`,
+          `/resources/booking/${config.micrositeId}?first=0&limit=20&sort=id&order=desc`,
+
+          // Legacy patterns
           `/booking/getBookings/${config.micrositeId}`,
+          `/booking/getBookings/${config.micrositeId}?first=0&limit=50`,
+
+          // Different resource names
           `/resources/bookings/${config.micrositeId}`,
+          `/resources/bookedTrip/${config.micrositeId}`,
+          `/resources/bookedtrip/${config.micrositeId}`,
+
+          // With date filters for 2025
+          `/resources/booking/${config.micrositeId}?fromDate=2025-01-01&toDate=2025-12-31`,
+          `/resources/booking/${config.micrositeId}?createdFrom=2025-01-01&createdTo=2025-12-31`,
+          `/resources/booking/${config.micrositeId}?startDate=2025-01-01&endDate=2025-12-31`,
+
+          // Query parameter variations
+          `/resources/booking/getBookings?micrositeId=${config.micrositeId}&first=0&limit=50`,
+          `/resources/booking/list?microsite=${config.micrositeId}&limit=50`,
+
+          // Without microsite in path
+          `/resources/booking?microsite=${config.micrositeId}&first=0&limit=50`,
+          `/resources/bookings?microsite=${config.micrositeId}&first=0&limit=50`,
         ]
 
         for (const endpoint of endpointsToTest) {
@@ -165,47 +210,63 @@ export class BookingEndpointDiscoverer {
                 "auth-token": token,
                 "Content-Type": "application/json",
                 Accept: "application/json",
+                "User-Agent": "TravelAssistant/1.0",
               },
             })
 
+            const responseText = await res.text()
+            let data: any = {}
+
+            try {
+              data = JSON.parse(responseText)
+            } catch {
+              data = { rawResponse: responseText }
+            }
+
             if (res.ok) {
-              const data: any = await res.json()
               console.log(`  ✅ SUCCESS: ${endpoint} (${res.status})`)
+              console.log(`  📊 Response keys: ${Object.keys(data).join(", ")}`)
 
               results.workingEndpoints.push({
                 endpoint,
                 status: res.status,
                 dataKeys: Object.keys(data),
-                totalCount: data.totalCount ?? data.total ?? 0,
+                totalCount: data.totalCount ?? data.total ?? data.count ?? 0,
                 micrositeId: config.micrositeId,
                 configName: config.name,
               })
 
-              // Extract bookings
+              // Extract bookings from various possible locations
               const bookings = data.bookedTrip ?? data.booking ?? data.bookings ?? data.results ?? data.data ?? []
               if (Array.isArray(bookings) && bookings.length > 0) {
                 console.log(`  📋 Found ${bookings.length} bookings`)
                 results.sampleBookings.push(...bookings.slice(0, 5))
+              } else if (data.id || data.reference || data.bookingReference) {
+                console.log(`  📋 Found single booking object`)
+                results.sampleBookings.push(data)
               }
             } else {
-              const errorText = await res.text()
-              console.log(`  ❌ FAILED: ${endpoint} (${res.status}) - ${errorText}`)
+              console.log(`  ❌ FAILED: ${endpoint} (${res.status}) - ${responseText.substring(0, 200)}`)
 
               results.failedEndpoints.push({
                 endpoint,
                 status: res.status,
-                error: errorText,
+                error: responseText.substring(0, 500),
                 micrositeId: config.micrositeId,
               })
             }
           } catch (err) {
-            console.log(`  ⚠️ ERROR: ${endpoint} - ${err}`)
+            const errorMsg = err instanceof Error ? err.message : "Unknown error"
+            console.log(`  ⚠️ ERROR: ${endpoint} - ${errorMsg}`)
             results.failedEndpoints.push({
               endpoint,
-              error: err instanceof Error ? err.message : "Unknown error",
+              error: errorMsg,
               micrositeId: config.micrositeId,
             })
           }
+
+          // Small delay to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 100))
         }
 
         // Test agencies for this microsite
@@ -216,6 +277,7 @@ export class BookingEndpointDiscoverer {
               "auth-token": token,
               "Content-Type": "application/json",
               Accept: "application/json",
+              "User-Agent": "TravelAssistant/1.0",
             },
           })
 
@@ -224,16 +286,62 @@ export class BookingEndpointDiscoverer {
             const agencies = agencyData.agency ?? agencyData.agencies ?? []
             console.log(`  ✅ Found ${agencies.length} agencies`)
             results.agencies.push(...agencies)
+
+            // Test agency-specific booking endpoints
+            for (const agency of agencies.slice(0, 2)) {
+              const agencyEndpoints = [
+                `/resources/booking/${config.micrositeId}/${agency.id}?first=0&limit=10`,
+                `/resources/booking/getBookings?microsite=${config.micrositeId}&agency=${agency.id}&first=0&limit=10`,
+              ]
+
+              for (const agencyEndpoint of agencyEndpoints) {
+                try {
+                  const res = await fetch(`${this.baseUrl}${agencyEndpoint}`, {
+                    headers: {
+                      "auth-token": token,
+                      "Content-Type": "application/json",
+                      Accept: "application/json",
+                    },
+                  })
+
+                  if (res.ok) {
+                    const data: any = await res.json()
+                    console.log(`  ✅ Agency endpoint works: ${agencyEndpoint}`)
+
+                    results.workingEndpoints.push({
+                      endpoint: agencyEndpoint,
+                      status: res.status,
+                      dataKeys: Object.keys(data),
+                      totalCount: data.totalCount ?? data.total ?? 0,
+                      micrositeId: config.micrositeId,
+                      configName: config.name,
+                      agencyId: agency.id,
+                      agencyName: agency.name,
+                    })
+
+                    const bookings = data.booking ?? data.bookings ?? []
+                    if (Array.isArray(bookings) && bookings.length > 0) {
+                      results.sampleBookings.push(...bookings.slice(0, 3))
+                    }
+                  }
+                } catch (err) {
+                  console.log(`  ⚠️ Agency endpoint error: ${agencyEndpoint}`)
+                }
+              }
+            }
+          } else {
+            console.log(`  ❌ Failed to fetch agencies: ${agencyRes.status}`)
           }
         } catch (err) {
           console.log(`  ⚠️ Could not fetch agencies: ${err}`)
         }
       } catch (authError) {
-        console.log(`❌ Authentication failed for ${config.name}: ${authError}`)
+        const errorMsg = authError instanceof Error ? authError.message : "Authentication failed"
+        console.log(`❌ Authentication failed for ${config.name}: ${errorMsg}`)
         results.testedConfigs.push({
           name: config.name,
           micrositeId: config.micrositeId,
-          status: `auth_failed: ${authError}`,
+          status: `auth_failed: ${errorMsg}`,
         })
       }
     }
@@ -264,11 +372,29 @@ export class BookingEndpointDiscoverer {
         const token = await this.authenticate(config)
 
         const searchEndpoints = [
+          // Standard search patterns
           `/resources/booking/getBookings?microsite=${config.micrositeId}&reference=${bookingId}`,
           `/resources/booking/getBookings?microsite=${config.micrositeId}&bookingReference=${bookingId}`,
+          `/resources/booking/getBookings?microsite=${config.micrositeId}&id=${bookingId}`,
+          `/resources/booking/getBookings?microsite=${config.micrositeId}&search=${bookingId}`,
+
+          // Direct access patterns
           `/resources/booking/${config.micrositeId}/${bookingId}`,
           `/resources/booking/${config.micrositeId}?reference=${bookingId}`,
+          `/resources/booking/${config.micrositeId}?bookingReference=${bookingId}`,
+          `/resources/booking/${config.micrositeId}?id=${bookingId}`,
+
+          // Legacy patterns
           `/booking/getBookings/${config.micrositeId}/${bookingId}`,
+          `/booking/getBookings/${config.micrositeId}?reference=${bookingId}`,
+
+          // Alternative resource names
+          `/resources/bookings/${config.micrositeId}/${bookingId}`,
+          `/resources/bookedTrip/${config.micrositeId}/${bookingId}`,
+
+          // Query-based searches
+          `/resources/booking?microsite=${config.micrositeId}&reference=${bookingId}`,
+          `/resources/bookings?microsite=${config.micrositeId}&reference=${bookingId}`,
         ]
 
         for (const endpoint of searchEndpoints) {
@@ -280,6 +406,7 @@ export class BookingEndpointDiscoverer {
                 "auth-token": token,
                 "Content-Type": "application/json",
                 Accept: "application/json",
+                "User-Agent": "TravelAssistant/1.0",
               },
             })
 
@@ -306,6 +433,9 @@ export class BookingEndpointDiscoverer {
                   return targetBooking
                 }
               }
+            } else {
+              const errorText = await res.text()
+              console.log(`  ❌ ${endpoint} → ${res.status}: ${errorText.substring(0, 100)}`)
             }
           } catch (err) {
             console.log(`  ⚠️ Error searching ${endpoint}: ${err}`)

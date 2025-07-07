@@ -38,6 +38,7 @@ import GPTAutoGenerator from "@/components/gpt-auto-generator"
 import GPTBackupManager from "@/components/gpt-backup-manager"
 import OpportunityMatrix from "@/components/opportunity-matrix"
 import MicrositeCredentialsTester from "@/components/microsite-credentials-tester"
+import FeatureManagementDashboard from "@/components/feature-management-dashboard"
 
 export default function SuperAdminPage() {
   const [activeTab, setActiveTab] = useState("overview")
@@ -148,6 +149,12 @@ export default function SuperAdminPage() {
               className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
             >
               🌐 Microsites
+            </TabsTrigger>
+            <TabsTrigger
+              value="feature-management"
+              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-500 data-[state=active]:to-red-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+            >
+              🎯 Features
             </TabsTrigger>
           </TabsList>
 
@@ -278,6 +285,9 @@ export default function SuperAdminPage() {
           </TabsContent>
           <TabsContent value="microsites">
             <MicrositeCredentialsTester />
+          </TabsContent>
+          <TabsContent value="feature-management">
+            <FeatureManagementDashboard />
           </TabsContent>
         </Tabs>
       </main>

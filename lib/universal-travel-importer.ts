@@ -2,6 +2,8 @@ export interface ImportRequest {
   type: "booking" | "idea" | "package"
   id: string
   micrositeId?: string
+  userEmail?: string
+  userRole?: string
 }
 
 export interface ImportResult {
@@ -90,12 +92,12 @@ export class UniversalTravelImporter {
     return authData.token
   }
 
-  // Universal import functie
+  // Universal import functie met permission checking
   async import(request: ImportRequest): Promise<ImportResult> {
     console.log(`🚀 Starting ${request.type} import for ID: ${request.id}`)
 
     const configs = request.micrositeId
-      ? this.getMicrositeConfigs().filter((c) => c.id === request.micrositeId)
+      ? this.getMicrositeConfigs().filter((c) => c.micrositeId === request.micrositeId)
       : this.getMicrositeConfigs()
 
     for (const config of configs) {
@@ -104,6 +106,16 @@ export class UniversalTravelImporter {
 
         const result = await this.importFromMicrosite(request, config)
         if (result.success) {
+          // Permission check
+          const hasPermission = await this.checkImportPermission(result.data, request)
+          if (!hasPermission) {
+            return {
+              success: false,
+              type: request.type,
+              error: "Je hebt geen toestemming om deze data te importeren",
+            }
+          }
+
           console.log(`✅ Successfully imported ${request.type} from ${config.name}`)
           return result
         }
@@ -118,6 +130,37 @@ export class UniversalTravelImporter {
       type: request.type,
       error: `${request.type} ${request.id} not found in any microsite`,
     }
+  }
+
+  // Permission check voor imported data
+  private async checkImportPermission(data: any, request: ImportRequest): Promise<boolean> {
+    // Super admins kunnen alles
+    if (request.userRole === "super_admin") return true
+
+    // Admins kunnen alles van hun microsites
+    if (request.userRole === "admin") return true
+
+    // Agents kunnen alleen hun eigen data
+    if (request.userRole === "agent" && request.userEmail) {
+      switch (request.type) {
+        case "booking":
+          const bookingOwnerEmail = data.client?.email || data.clientEmail || data.customer?.email
+          return bookingOwnerEmail === request.userEmail
+
+        case "idea":
+          const ideaOwnerEmail = data.customer?.email || data.clientEmail || data.user
+          return ideaOwnerEmail === request.userEmail
+
+        case "package":
+          // Packages zijn meestal publiek
+          return true
+
+        default:
+          return false
+      }
+    }
+
+    return false
   }
 
   // Import van specifieke microsite
@@ -136,20 +179,14 @@ export class UniversalTravelImporter {
     }
   }
 
-  // Booking import - ONLY direct API calls, no fallbacks
+  // Booking import - ONLY direct API calls
   private async importBooking(bookingId: string, config: any, token: string): Promise<ImportResult> {
     console.log(`📋 Importing booking ${bookingId} from ${config.name}`)
 
-    // Clean the booking ID - remove RRP- prefix if present
     const cleanBookingId = bookingId.replace(/^RRP-?/i, "")
-
-    // Try both original and cleaned ID
     const idsToTry = [bookingId, cleanBookingId]
 
     for (const idToTry of idsToTry) {
-      console.log(`🔍 Trying booking ID: ${idToTry}`)
-
-      // Try different booking endpoints
       const endpoints = [
         `${this.baseUrl}/resources/booking/${config.micrositeId}/${idToTry}`,
         `${this.baseUrl}/resources/booking/getBooking?microsite=${config.micrositeId}&bookingId=${idToTry}`,
@@ -158,8 +195,6 @@ export class UniversalTravelImporter {
 
       for (const endpoint of endpoints) {
         try {
-          console.log(`🔗 Trying booking endpoint: ${endpoint}`)
-
           const response = await fetch(endpoint, {
             headers: {
               "auth-token": token,
@@ -168,13 +203,9 @@ export class UniversalTravelImporter {
             },
           })
 
-          console.log(`📡 Booking response status: ${response.status}`)
-
           if (response.ok) {
             const data = await response.json()
-            console.log(`📋 Booking data keys:`, Object.keys(data))
 
-            // Only return if we actually got booking data
             if (data && (data.id || data.bookingReference || data.bookingId || data.bookedTrip)) {
               return {
                 success: true,
@@ -182,25 +213,16 @@ export class UniversalTravelImporter {
                 data: this.transformBookingData(data, bookingId),
                 foundInMicrosite: config.name,
                 searchMethod: `Direct booking lookup via ${endpoint}`,
-                debugInfo: {
-                  endpoint,
-                  originalId: bookingId,
-                  cleanedId: cleanBookingId,
-                  usedId: idToTry,
-                  responseKeys: Object.keys(data),
-                },
               }
             }
           }
         } catch (error) {
-          console.log(`❌ Booking endpoint error: ${endpoint} -`, error)
           continue
         }
       }
     }
 
-    // If no direct lookup works, fail - NO fallbacks
-    throw new Error(`Booking ${bookingId} (tried: ${idsToTry.join(", ")}) not found in ${config.name}`)
+    throw new Error(`Booking ${bookingId} not found in ${config.name}`)
   }
 
   // Travel Idea import
@@ -234,7 +256,6 @@ export class UniversalTravelImporter {
   private async importPackage(packageId: string, config: any, token: string): Promise<ImportResult> {
     console.log(`📦 Importing package ${packageId} from ${config.name}`)
 
-    // Probeer verschillende package endpoints
     const endpoints = [
       `${this.baseUrl}/resources/package/${config.micrositeId}/${packageId}?lang=nl`,
       `${this.baseUrl}/resources/package/${config.micrositeId}/${packageId}`,
@@ -243,8 +264,6 @@ export class UniversalTravelImporter {
 
     for (const endpoint of endpoints) {
       try {
-        console.log(`🔗 Trying package endpoint: ${endpoint}`)
-
         const response = await fetch(endpoint, {
           headers: {
             "auth-token": token,
@@ -255,7 +274,6 @@ export class UniversalTravelImporter {
 
         if (response.ok) {
           const data = await response.json()
-          console.log(`✅ Package data received from ${endpoint}`)
 
           return {
             success: true,
@@ -263,21 +281,94 @@ export class UniversalTravelImporter {
             data: this.transformPackageData(data, packageId),
             foundInMicrosite: config.name,
             searchMethod: `Direct package lookup via ${endpoint}`,
-            debugInfo: {
-              endpoint,
-              responseKeys: Object.keys(data),
-            },
           }
-        } else {
-          console.log(`❌ Package endpoint failed: ${endpoint} - ${response.status}`)
         }
       } catch (error) {
-        console.log(`❌ Package endpoint error: ${endpoint} -`, error)
         continue
       }
     }
 
     throw new Error(`Package ${packageId} not found in ${config.name}`)
+  }
+
+  // Haal bookings op voor specifieke user
+  async getUserBookings(micrositeId: string, userEmail: string): Promise<any[]> {
+    try {
+      const token = await this.authenticate(micrositeId)
+
+      const endpoints = [
+        `/resources/booking/${micrositeId}?clientEmail=${encodeURIComponent(userEmail)}`,
+        `/resources/booking/${micrositeId}?email=${encodeURIComponent(userEmail)}`,
+        `/resources/booking/${micrositeId}?client=${encodeURIComponent(userEmail)}`,
+      ]
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            headers: {
+              "auth-token": token,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            const bookings = data.booking || data.bookings || []
+            if (bookings.length > 0) {
+              return bookings
+            }
+          }
+        } catch (error) {
+          continue
+        }
+      }
+
+      return []
+    } catch (error) {
+      console.log(`⚠️ Could not fetch bookings for user ${userEmail}:`, error)
+      return []
+    }
+  }
+
+  // Haal ideas op voor specifieke user
+  async getUserIdeas(micrositeId: string, userEmail: string): Promise<any[]> {
+    try {
+      const token = await this.authenticate(micrositeId)
+
+      const endpoints = [
+        `/resources/travelideas/${micrositeId}?clientEmail=${encodeURIComponent(userEmail)}`,
+        `/resources/ideas/${micrositeId}?email=${encodeURIComponent(userEmail)}`,
+        `/resources/travelidea/${micrositeId}?client=${encodeURIComponent(userEmail)}`,
+      ]
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            headers: {
+              "auth-token": token,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            const ideas = data.travelIdea || data.ideas || data.travelideas || []
+            if (ideas.length > 0) {
+              return ideas
+            }
+          }
+        } catch (error) {
+          continue
+        }
+      }
+
+      return []
+    } catch (error) {
+      console.log(`⚠️ Could not fetch ideas for user ${userEmail}:`, error)
+      return []
+    }
   }
 
   // Data transformers
@@ -358,12 +449,6 @@ export class UniversalTravelImporter {
       try {
         const result = await this.import(request)
         results.push(result)
-
-        if (result.success) {
-          console.log(`✅ ${request.type} ${request.id} imported successfully`)
-        } else {
-          console.log(`❌ ${request.type} ${request.id} failed: ${result.error}`)
-        }
       } catch (error) {
         results.push({
           success: false,
@@ -372,9 +457,6 @@ export class UniversalTravelImporter {
         })
       }
     }
-
-    const successful = results.filter((r) => r.success).length
-    console.log(`🎯 Batch import complete: ${successful}/${requests.length} successful`)
 
     return results
   }
