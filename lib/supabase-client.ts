@@ -14,7 +14,12 @@ if (!supabaseAnonKey) {
 }
 
 // Client-side Supabase client (uses anon key)
-export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+})
 
 // Server-side Supabase client (uses service role key)
 export const supabaseAdmin = supabaseServiceKey
@@ -44,7 +49,12 @@ export function getSupabaseServiceClient() {
 
 // Client-side Supabase client creation function
 export function createClient() {
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  })
 }
 
 // Server-side client creation function
@@ -53,209 +63,377 @@ export function createServerClient() {
     console.warn("Missing SUPABASE_SERVICE_ROLE_KEY, falling back to anon key")
     return createSupabaseClient(supabaseUrl, supabaseAnonKey)
   }
-  return createSupabaseClient(supabaseUrl, supabaseServiceKey)
+  return createSupabaseClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 }
 
 // Default export for backward compatibility
-export default createClient()
+export default supabase
 
 // Database types
 export type Database = {
   public: {
     Tables: {
-      feature_requests: {
+      agencies: {
         Row: {
           id: string
-          title: string
-          description: string
-          category: string
-          priority: "low" | "medium" | "high"
-          status: "pending" | "in_progress" | "completed" | "rejected"
-          votes: number
+          name: string
+          code: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          address: any
+          settings: any
+          active: boolean
           created_at: string
           updated_at: string
-          created_by: string
         }
         Insert: {
           id?: string
-          title: string
-          description: string
-          category: string
-          priority?: "low" | "medium" | "high"
-          status?: "pending" | "in_progress" | "completed" | "rejected"
-          votes?: number
+          name: string
+          code?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          address?: any
+          settings?: any
+          active?: boolean
           created_at?: string
           updated_at?: string
-          created_by: string
         }
         Update: {
           id?: string
-          title?: string
-          description?: string
-          category?: string
-          priority?: "low" | "medium" | "high"
-          status?: "pending" | "in_progress" | "completed" | "rejected"
-          votes?: number
+          name?: string
+          code?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          address?: any
+          settings?: any
+          active?: boolean
           created_at?: string
           updated_at?: string
-          created_by?: string
-        }
-      }
-      feature_comments: {
-        Row: {
-          id: string
-          feature_request_id: string
-          comment: string
-          created_at: string
-          created_by: string
-        }
-        Insert: {
-          id?: string
-          feature_request_id: string
-          comment: string
-          created_at?: string
-          created_by: string
-        }
-        Update: {
-          id?: string
-          feature_request_id?: string
-          comment?: string
-          created_at?: string
-          created_by?: string
-        }
-      }
-      feature_votes: {
-        Row: {
-          id: string
-          feature_request_id: string
-          user_id: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          feature_request_id: string
-          user_id: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          feature_request_id?: string
-          user_id?: string
-          created_at?: string
         }
       }
       users: {
         Row: {
           id: string
           email: string
-          name: string
-          role: "user" | "admin" | "super_admin"
+          first_name: string | null
+          last_name: string | null
+          name: string | null
+          role: "admin" | "agent" | "client" | "super_admin"
+          status: "active" | "inactive" | "pending_verification" | "suspended"
+          travel_compositor_id: string | null
+          agency_name: string | null
+          agency_id: string | null
+          microsite_id: string | null
+          email_verified: boolean
+          password_reset_required: boolean
+          import_source: string | null
+          import_date: string | null
+          last_login: string | null
+          profile_data: any
+          active: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           email: string
-          name: string
-          role?: "user" | "admin" | "super_admin"
+          first_name?: string | null
+          last_name?: string | null
+          name?: string | null
+          role?: "admin" | "agent" | "client" | "super_admin"
+          status?: "active" | "inactive" | "pending_verification" | "suspended"
+          travel_compositor_id?: string | null
+          agency_name?: string | null
+          agency_id?: string | null
+          microsite_id?: string | null
+          email_verified?: boolean
+          password_reset_required?: boolean
+          import_source?: string | null
+          import_date?: string | null
+          last_login?: string | null
+          profile_data?: any
+          active?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           email?: string
-          name?: string
-          role?: "user" | "admin" | "super_admin"
+          first_name?: string | null
+          last_name?: string | null
+          name?: string | null
+          role?: "admin" | "agent" | "client" | "super_admin"
+          status?: "active" | "inactive" | "pending_verification" | "suspended"
+          travel_compositor_id?: string | null
+          agency_name?: string | null
+          agency_id?: string | null
+          microsite_id?: string | null
+          email_verified?: boolean
+          password_reset_required?: boolean
+          import_source?: string | null
+          import_date?: string | null
+          last_login?: string | null
+          profile_data?: any
+          active?: boolean
           created_at?: string
           updated_at?: string
+        }
+      }
+      feature_requests: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          user_id: string
+          category: "enhancement" | "bug" | "feature" | "improvement"
+          priority: "low" | "medium" | "high" | "critical"
+          status: "open" | "in_progress" | "completed" | "rejected" | "on_hold"
+          votes: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          user_id: string
+          category?: "enhancement" | "bug" | "feature" | "improvement"
+          priority?: "low" | "medium" | "high" | "critical"
+          status?: "open" | "in_progress" | "completed" | "rejected" | "on_hold"
+          votes?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          user_id?: string
+          category?: "enhancement" | "bug" | "feature" | "improvement"
+          priority?: "low" | "medium" | "high" | "critical"
+          status?: "open" | "in_progress" | "completed" | "rejected" | "on_hold"
+          votes?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      feature_votes: {
+        Row: {
+          id: string
+          feature_id: string
+          user_id: string
+          vote_type: "up" | "down"
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          feature_id: string
+          user_id: string
+          vote_type: "up" | "down"
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          feature_id?: string
+          user_id?: string
+          vote_type?: "up" | "down"
+          created_at?: string
+        }
+      }
+      feature_comments: {
+        Row: {
+          id: string
+          feature_id: string
+          user_id: string
+          user_name: string
+          comment: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          feature_id: string
+          user_id: string
+          user_name: string
+          comment: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          feature_id?: string
+          user_id?: string
+          user_name?: string
+          comment?: string
+          created_at?: string
         }
       }
       bookings: {
         Row: {
           id: string
-          booking_reference: string
-          user_id: string
-          title: string
-          description: string
-          status: "pending" | "confirmed" | "cancelled" | "completed"
-          total_amount: number
+          booking_reference: string | null
+          user_id: string | null
+          agency_id: string | null
+          status: "active" | "cancelled" | "completed" | "pending"
+          destination: string | null
+          microsite_source: string | null
+          start_date: string | null
+          end_date: string | null
+          total_price: number
           currency: string
-          travel_date: string
+          accommodations: any
+          activities: any
+          transports: any
+          vouchers: any
+          raw_data: any
+          webhook_received_at: string
           created_at: string
           updated_at: string
-          booking_data: any
         }
         Insert: {
           id?: string
-          booking_reference: string
-          user_id: string
-          title: string
-          description?: string
-          status?: "pending" | "confirmed" | "cancelled" | "completed"
-          total_amount?: number
+          booking_reference?: string | null
+          user_id?: string | null
+          agency_id?: string | null
+          status?: "active" | "cancelled" | "completed" | "pending"
+          destination?: string | null
+          microsite_source?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          total_price?: number
           currency?: string
-          travel_date: string
+          accommodations?: any
+          activities?: any
+          transports?: any
+          vouchers?: any
+          raw_data?: any
+          webhook_received_at?: string
           created_at?: string
           updated_at?: string
-          booking_data?: any
         }
         Update: {
           id?: string
-          booking_reference?: string
-          user_id?: string
-          title?: string
-          description?: string
-          status?: "pending" | "confirmed" | "cancelled" | "completed"
-          total_amount?: number
+          booking_reference?: string | null
+          user_id?: string | null
+          agency_id?: string | null
+          status?: "active" | "cancelled" | "completed" | "pending"
+          destination?: string | null
+          microsite_source?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          total_price?: number
           currency?: string
-          travel_date?: string
+          accommodations?: any
+          activities?: any
+          transports?: any
+          vouchers?: any
+          raw_data?: any
+          webhook_received_at?: string
           created_at?: string
           updated_at?: string
-          booking_data?: any
         }
       }
       travel_ideas: {
         Row: {
           id: string
-          user_id: string
           title: string
-          description: string
-          destination: string
-          duration: number
-          budget: number
+          description: string | null
+          destination: string | null
+          duration_days: number | null
+          price_from: number
+          price_to: number
           currency: string
-          status: "draft" | "published" | "archived"
+          category: string | null
+          tags: any
+          images: any
+          highlights: any
+          included_services: any
+          raw_data: any
+          webhook_received_at: string
+          microsite_source: string | null
+          status: string
           created_at: string
           updated_at: string
-          idea_data: any
         }
         Insert: {
           id?: string
-          user_id: string
           title: string
-          description: string
-          destination: string
-          duration: number
-          budget?: number
+          description?: string | null
+          destination?: string | null
+          duration_days?: number | null
+          price_from?: number
+          price_to?: number
           currency?: string
-          status?: "draft" | "published" | "archived"
+          category?: string | null
+          tags?: any
+          images?: any
+          highlights?: any
+          included_services?: any
+          raw_data?: any
+          webhook_received_at?: string
+          microsite_source?: string | null
+          status?: string
           created_at?: string
           updated_at?: string
-          idea_data?: any
         }
         Update: {
           id?: string
-          user_id?: string
           title?: string
-          description?: string
-          destination?: string
-          duration?: number
-          budget?: number
+          description?: string | null
+          destination?: string | null
+          duration_days?: number | null
+          price_from?: number
+          price_to?: number
           currency?: string
-          status?: "draft" | "published" | "archived"
+          category?: string | null
+          tags?: any
+          images?: any
+          highlights?: any
+          included_services?: any
+          raw_data?: any
+          webhook_received_at?: string
+          microsite_source?: string | null
+          status?: string
           created_at?: string
           updated_at?: string
-          idea_data?: any
+        }
+      }
+      webhook_events: {
+        Row: {
+          id: string
+          event_type: string
+          source: string
+          payload: any
+          processed: boolean
+          processed_at: string | null
+          error_message: string | null
+          retry_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_type: string
+          source: string
+          payload: any
+          processed?: boolean
+          processed_at?: string | null
+          error_message?: string | null
+          retry_count?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_type?: string
+          source?: string
+          payload?: any
+          processed?: boolean
+          processed_at?: string | null
+          error_message?: string | null
+          retry_count?: number
+          created_at?: string
         }
       }
     }
