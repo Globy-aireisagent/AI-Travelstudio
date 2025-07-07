@@ -1,844 +1,1172 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-} from "recharts"
-import {
-  Settings,
-  TrendingUp,
-  Users,
+  Plus,
+  ThumbsUp,
+  ThumbsDown,
   MessageSquare,
+  Search,
+  TrendingUp,
+  Clock,
   CheckCircle,
   XCircle,
-  Clock,
-  AlertTriangle,
+  AlertCircle,
+  Pause,
   Edit,
   Trash2,
-  Eye,
-  Filter,
-  Download,
-  Mail,
-  Bell,
-  Archive,
-  Star,
-  Flag,
-  Calendar,
-  Activity,
+  Users,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase-client"
 
 interface FeatureRequest {
   id: string
   title: string
   description: string
-  user_id: string
-  category: string
-  priority: string
-  status: string
+  category: "feature" | "enhancement" | "bug" | "improvement"
+  priority: "low" | "medium" | "high" | "critical"
+  status: "pending" | "submitted" | "in_progress" | "completed" | "rejected" | "on_hold"
   votes: number
+  upvotes: number
+  downvotes: number
+  created_by?: string
+  user_id?: string
   created_at: string
   updated_at: string
-  comments_count?: number
 }
 
-interface FeatureStats {
-  total: number
-  open: number
-  in_progress: number
-  completed: number
-  rejected: number
-  on_hold: number
-  planned: number
-  total_votes: number
-  avg_votes: number
-  top_category: string
+interface FeatureComment {
+  id: string
+  feature_id: string
+  user_id: string
+  comment: string
+  created_at: string
 }
 
-const statusColors = {
-  open: "bg-blue-100 text-blue-800 border-blue-200",
-  in_progress: "bg-purple-100 text-purple-800 border-purple-200",
-  completed: "bg-green-100 text-green-800 border-green-200",
-  on_hold: "bg-gray-100 text-gray-800 border-gray-200",
-  rejected: "bg-red-100 text-red-800 border-red-200",
-  planned: "bg-indigo-100 text-indigo-800 border-indigo-200",
+interface FeatureVote {
+  id: string
+  feature_id: string
+  user_id: string
+  vote_type: "up" | "down"
+  created_at: string
 }
 
-const priorityColors = {
-  critical: "bg-red-100 text-red-800 border-red-200",
-  high: "bg-orange-100 text-orange-800 border-orange-200",
-  medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  low: "bg-green-100 text-green-800 border-green-200",
-}
+// Mock data for offline functionality
+const mockFeatures: FeatureRequest[] = [
+  {
+    id: "1",
+    title: "AI-Powered Itinerary Generator",
+    description:
+      "Automatically generate personalized travel itineraries based on user preferences, budget, and travel dates using AI.",
+    category: "feature",
+    priority: "high",
+    status: "in_progress",
+    votes: 15,
+    upvotes: 18,
+    downvotes: 3,
+    created_by: "admin",
+    user_id: "system",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    title: "Real-time Flight Price Tracking",
+    description: "Monitor flight prices in real-time and send notifications when prices drop for saved routes.",
+    category: "feature",
+    priority: "high",
+    status: "pending",
+    votes: 12,
+    upvotes: 14,
+    downvotes: 2,
+    created_by: "admin",
+    user_id: "system",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "3",
+    title: "Multi-language Support",
+    description: "Add support for multiple languages including Dutch, German, French, and Spanish.",
+    category: "enhancement",
+    priority: "medium",
+    status: "pending",
+    votes: 8,
+    upvotes: 10,
+    downvotes: 2,
+    created_by: "admin",
+    user_id: "system",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+]
 
-const categoryColors = {
-  feature: "bg-blue-100 text-blue-800 border-blue-200",
-  enhancement: "bg-green-100 text-green-800 border-green-200",
-  bug: "bg-red-100 text-red-800 border-red-200",
-  improvement: "bg-purple-100 text-purple-800 border-purple-200",
-  integration: "bg-orange-100 text-orange-800 border-orange-200",
-}
-
-export default function FeatureManagementDashboard() {
+export function FeatureManagementDashboard() {
   const [features, setFeatures] = useState<FeatureRequest[]>([])
-  const [stats, setStats] = useState<FeatureStats | null>(null)
+  const [comments, setComments] = useState<FeatureComment[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedFeature, setSelectedFeature] = useState<FeatureRequest | null>(null)
-  const [editingFeature, setEditingFeature] = useState<FeatureRequest | null>(null)
-  const [filterStatus, setFilterStatus] = useState("all")
-  const [filterPriority, setFilterPriority] = useState("all")
-  const [filterCategory, setFilterCategory] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
-  const [activeTab, setActiveTab] = useState("overview")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const [priorityFilter, setPriorityFilter] = useState<string>("all")
+  const [selectedFeature, setSelectedFeature] = useState<FeatureRequest | null>(null)
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [newComment, setNewComment] = useState("")
+
+  // Form state for creating/editing features
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    category: "feature" as const,
+    priority: "medium" as const,
+    status: "pending" as const,
+  })
+
+  const supabase = createClient()
 
   useEffect(() => {
-    fetchFeatures()
+    loadFeatures()
+    loadComments()
   }, [])
 
-  useEffect(() => {
-    if (features.length > 0) {
-      calculateStats()
-    }
-  }, [features])
-
-  const fetchFeatures = async () => {
+  const loadFeatures = async () => {
     try {
-      setLoading(true)
-      const response = await fetch("/api/feature-requests")
-      const result = await response.json()
+      const { data, error } = await supabase
+        .from("feature_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
 
-      if (result.success) {
-        setFeatures(result.data)
+      if (error) {
+        console.error("Supabase error:", error)
+        setFeatures(mockFeatures)
+        toast({
+          title: "Using Mock Data",
+          description: "Could not connect to Supabase, using sample data.",
+          variant: "default",
+        })
       } else {
-        // Use demo data as fallback
-        setFeatures(getDemoFeatures())
+        setFeatures(data || [])
       }
     } catch (error) {
-      console.error("Error fetching features:", error)
-      setFeatures(getDemoFeatures())
+      console.error("Error loading features:", error)
+      setFeatures(mockFeatures)
+      toast({
+        title: "Using Mock Data",
+        description: "Could not connect to database, using sample data.",
+        variant: "default",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const calculateStats = () => {
-    const total = features.length
-    const statusCounts = features.reduce(
-      (acc, feature) => {
-        acc[feature.status] = (acc[feature.status] || 0) + 1
-        return acc
-      },
-      {} as Record<string, number>,
-    )
-
-    const totalVotes = features.reduce((sum, feature) => sum + feature.votes, 0)
-    const avgVotes = total > 0 ? Math.round(totalVotes / total) : 0
-
-    const categoryCounts = features.reduce(
-      (acc, feature) => {
-        acc[feature.category] = (acc[feature.category] || 0) + 1
-        return acc
-      },
-      {} as Record<string, number>,
-    )
-
-    const topCategory = Object.entries(categoryCounts).sort(([, a], [, b]) => b - a)[0]?.[0] || "feature"
-
-    setStats({
-      total,
-      open: statusCounts.open || 0,
-      in_progress: statusCounts.in_progress || 0,
-      completed: statusCounts.completed || 0,
-      rejected: statusCounts.rejected || 0,
-      on_hold: statusCounts.on_hold || 0,
-      planned: statusCounts.planned || 0,
-      total_votes: totalVotes,
-      avg_votes: avgVotes,
-      top_category: topCategory,
-    })
-  }
-
-  const updateFeatureStatus = async (featureId: string, newStatus: string) => {
+  const loadComments = async () => {
     try {
-      const response = await fetch(`/api/feature-requests/${featureId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: newStatus }),
-      })
+      const { data, error } = await supabase
+        .from("feature_comments")
+        .select("*")
+        .order("created_at", { ascending: true })
 
-      if (response.ok) {
-        setFeatures((prev) =>
-          prev.map((feature) => (feature.id === featureId ? { ...feature, status: newStatus } : feature)),
-        )
-        toast({
-          title: "Status Updated",
-          description: `Feature status changed to ${newStatus.replace("_", " ")}`,
-        })
+      if (error) {
+        console.error("Error loading comments:", error)
+        setComments([])
+      } else {
+        setComments(data || [])
       }
     } catch (error) {
-      console.error("Error updating status:", error)
+      console.error("Error loading comments:", error)
+      setComments([])
+    }
+  }
+
+  const handleCreateFeature = async () => {
+    if (!formData.title.trim() || !formData.description.trim()) {
       toast({
         title: "Error",
-        description: "Failed to update feature status",
+        description: "Title and description are required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("feature_requests")
+        .insert([
+          {
+            ...formData,
+            created_by: "admin",
+            user_id: "system",
+            votes: 0,
+            upvotes: 0,
+            downvotes: 0,
+          },
+        ])
+        .select()
+        .single()
+
+      if (error) {
+        throw error
+      }
+
+      setFeatures([data, ...features])
+      setIsCreateDialogOpen(false)
+      setFormData({
+        title: "",
+        description: "",
+        category: "feature",
+        priority: "medium",
+        status: "pending",
+      })
+      toast({
+        title: "Feature Created",
+        description: "New feature request has been created successfully.",
+      })
+    } catch (error) {
+      console.error("Error creating feature:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create feature request.",
         variant: "destructive",
       })
     }
   }
 
-  const deleteFeature = async (featureId: string) => {
-    if (!confirm("Are you sure you want to delete this feature request?")) return
+  const handleUpdateFeature = async () => {
+    if (!selectedFeature) return
 
     try {
-      const response = await fetch(`/api/feature-requests/${featureId}`, {
-        method: "DELETE",
-      })
+      const { data, error } = await supabase
+        .from("feature_requests")
+        .update(formData)
+        .eq("id", selectedFeature.id)
+        .select()
+        .single()
 
-      if (response.ok) {
-        setFeatures((prev) => prev.filter((feature) => feature.id !== featureId))
-        toast({
-          title: "Feature Deleted",
-          description: "Feature request has been deleted successfully",
-        })
+      if (error) {
+        throw error
       }
+
+      setFeatures(features.map((f) => (f.id === selectedFeature.id ? data : f)))
+      setIsEditDialogOpen(false)
+      setSelectedFeature(null)
+      toast({
+        title: "Feature Updated",
+        description: "Feature request has been updated successfully.",
+      })
+    } catch (error) {
+      console.error("Error updating feature:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update feature request.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteFeature = async (featureId: string) => {
+    try {
+      const { error } = await supabase.from("feature_requests").delete().eq("id", featureId)
+
+      if (error) {
+        throw error
+      }
+
+      setFeatures(features.filter((f) => f.id !== featureId))
+      toast({
+        title: "Feature Deleted",
+        description: "Feature request has been deleted successfully.",
+      })
     } catch (error) {
       console.error("Error deleting feature:", error)
       toast({
         title: "Error",
-        description: "Failed to delete feature request",
+        description: "Failed to delete feature request.",
         variant: "destructive",
       })
     }
   }
 
-  const getFilteredFeatures = () => {
-    return features.filter((feature) => {
-      const matchesStatus = filterStatus === "all" || feature.status === filterStatus
-      const matchesPriority = filterPriority === "all" || feature.priority === filterPriority
-      const matchesCategory = filterCategory === "all" || feature.category === filterCategory
-      const matchesSearch =
-        searchTerm === "" ||
-        feature.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        feature.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleVote = async (featureId: string, voteType: "up" | "down") => {
+    try {
+      // First, check if user has already voted
+      const { data: existingVote } = await supabase
+        .from("feature_votes")
+        .select("*")
+        .eq("feature_id", featureId)
+        .eq("user_id", "current_user")
+        .single()
 
-      return matchesStatus && matchesPriority && matchesCategory && matchesSearch
-    })
+      if (existingVote) {
+        // Update existing vote
+        await supabase.from("feature_votes").update({ vote_type: voteType }).eq("id", existingVote.id)
+      } else {
+        // Create new vote
+        await supabase.from("feature_votes").insert([
+          {
+            feature_id: featureId,
+            user_id: "current_user",
+            vote_type: voteType,
+          },
+        ])
+      }
+
+      // Reload features to get updated vote counts
+      loadFeatures()
+      toast({
+        title: "Vote Recorded",
+        description: `Your ${voteType}vote has been recorded.`,
+      })
+    } catch (error) {
+      console.error("Error voting:", error)
+      toast({
+        title: "Error",
+        description: "Failed to record your vote.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAddComment = async (featureId: string) => {
+    if (!newComment.trim()) return
+
+    try {
+      const { data, error } = await supabase
+        .from("feature_comments")
+        .insert([
+          {
+            feature_id: featureId,
+            user_id: "current_user",
+            comment: newComment,
+          },
+        ])
+        .select()
+        .single()
+
+      if (error) {
+        throw error
+      }
+
+      setComments([...comments, data])
+      setNewComment("")
+      toast({
+        title: "Comment Added",
+        description: "Your comment has been added successfully.",
+      })
+    } catch (error) {
+      console.error("Error adding comment:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add your comment.",
+        variant: "destructive",
+      })
+    }
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "open":
-        return <AlertTriangle className="h-4 w-4" />
-      case "in_progress":
-        return <Clock className="h-4 w-4" />
       case "completed":
-        return <CheckCircle className="h-4 w-4" />
+        return <CheckCircle className="h-4 w-4 text-green-500" />
+      case "in_progress":
+        return <Clock className="h-4 w-4 text-blue-500" />
       case "rejected":
-        return <XCircle className="h-4 w-4" />
+        return <XCircle className="h-4 w-4 text-red-500" />
       case "on_hold":
-        return <Archive className="h-4 w-4" />
-      case "planned":
-        return <Calendar className="h-4 w-4" />
+        return <Pause className="h-4 w-4 text-yellow-500" />
       default:
-        return <AlertTriangle className="h-4 w-4" />
+        return <AlertCircle className="h-4 w-4 text-gray-500" />
     }
   }
 
-  const getChartData = () => {
-    if (!stats) return []
-
-    return [
-      { name: "Open", value: stats.open, color: "#3B82F6" },
-      { name: "In Progress", value: stats.in_progress, color: "#8B5CF6" },
-      { name: "Completed", value: stats.completed, color: "#10B981" },
-      { name: "Planned", value: stats.planned, color: "#6366F1" },
-      { name: "On Hold", value: stats.on_hold, color: "#6B7280" },
-      { name: "Rejected", value: stats.rejected, color: "#EF4444" },
-    ].filter((item) => item.value > 0)
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-green-100 text-green-800"
+      case "in_progress":
+        return "bg-blue-100 text-blue-800"
+      case "rejected":
+        return "bg-red-100 text-red-800"
+      case "on_hold":
+        return "bg-yellow-100 text-yellow-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
   }
 
-  const getVotesChartData = () => {
-    return features
-      .sort((a, b) => b.votes - a.votes)
-      .slice(0, 10)
-      .map((feature) => ({
-        name: feature.title.length > 20 ? feature.title.substring(0, 20) + "..." : feature.title,
-        votes: feature.votes,
-      }))
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "critical":
+        return "bg-red-100 text-red-800"
+      case "high":
+        return "bg-orange-100 text-orange-800"
+      case "medium":
+        return "bg-yellow-100 text-yellow-800"
+      case "low":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
   }
 
-  const getTrendData = () => {
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date()
-      date.setDate(date.getDate() - (6 - i))
-      return date.toISOString().split("T")[0]
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case "feature":
+        return "bg-blue-100 text-blue-800"
+      case "enhancement":
+        return "bg-purple-100 text-purple-800"
+      case "bug":
+        return "bg-red-100 text-red-800"
+      case "improvement":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const filteredFeatures = features.filter((feature) => {
+    const matchesSearch =
+      feature.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      feature.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === "all" || feature.status === statusFilter
+    const matchesCategory = categoryFilter === "all" || feature.category === categoryFilter
+    const matchesPriority = priorityFilter === "all" || feature.priority === priorityFilter
+
+    return matchesSearch && matchesStatus && matchesCategory && matchesPriority
+  })
+
+  const getFeatureComments = (featureId: string) => {
+    return comments.filter((comment) => comment.feature_id === featureId)
+  }
+
+  const openEditDialog = (feature: FeatureRequest) => {
+    setSelectedFeature(feature)
+    setFormData({
+      title: feature.title,
+      description: feature.description,
+      category: feature.category,
+      priority: feature.priority,
+      status: feature.status,
     })
+    setIsEditDialogOpen(true)
+  }
 
-    return last7Days.map((date) => ({
-      date: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      created: features.filter((f) => f.created_at.startsWith(date)).length,
-      completed: features.filter((f) => f.status === "completed" && f.updated_at.startsWith(date)).length,
-    }))
+  const openViewDialog = (feature: FeatureRequest) => {
+    setSelectedFeature(feature)
+    setIsViewDialogOpen(true)
+  }
+
+  // Statistics
+  const stats = {
+    total: features.length,
+    pending: features.filter((f) => f.status === "pending").length,
+    inProgress: features.filter((f) => f.status === "in_progress").length,
+    completed: features.filter((f) => f.status === "completed").length,
+    totalVotes: features.reduce((sum, f) => sum + f.votes, 0),
+    totalUpvotes: features.reduce((sum, f) => sum + (f.upvotes || 0), 0),
+    totalDownvotes: features.reduce((sum, f) => sum + (f.downvotes || 0), 0),
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading feature management...</p>
-        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Feature Request Management</h2>
-          <p className="text-gray-600">Manage and track all feature requests from users</p>
+          <h2 className="text-3xl font-bold">Feature Management</h2>
+          <p className="text-muted-foreground">Manage feature requests and development roadmap</p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-          <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-            <Mail className="h-4 w-4" />
-            Notify Users
-          </Button>
-        </div>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Feature Request
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Create New Feature Request</DialogTitle>
+              <DialogDescription>Add a new feature request to the development roadmap.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Enter feature title"
+                />
+              </div>
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Describe the feature request in detail"
+                  rows={4}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value: any) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="feature">Feature</SelectItem>
+                      <SelectItem value="enhancement">Enhancement</SelectItem>
+                      <SelectItem value="bug">Bug</SelectItem>
+                      <SelectItem value="improvement">Improvement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select
+                    value={formData.priority}
+                    onValueChange={(value: any) => setFormData({ ...formData, priority: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value: any) => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="submitted">Submitted</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                      <SelectItem value="on_hold">On Hold</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateFeature} disabled={!formData.title || !formData.description}>
+                Create Feature Request
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-4 w-full bg-white rounded-2xl shadow-lg p-2">
-          <TabsTrigger
-            value="overview"
-            className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-500 data-[state=active]:to-red-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
-          >
-            📊 Overview
-          </TabsTrigger>
-          <TabsTrigger
-            value="features"
-            className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
-          >
-            🎯 Features
-          </TabsTrigger>
-          <TabsTrigger
-            value="analytics"
-            className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
-          >
-            📈 Analytics
-          </TabsTrigger>
-          <TabsTrigger
-            value="settings"
-            className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-500 data-[state=active]:to-gray-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
-          >
-            ⚙️ Settings
-          </TabsTrigger>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="features">Features</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {stats && (
-            <>
-              {/* KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-3xl shadow-xl">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-blue-100">Total Features</p>
-                        <p className="text-3xl font-bold">{stats.total}</p>
-                      </div>
-                      <Activity className="h-12 w-12 text-blue-200" />
-                    </div>
-                  </CardContent>
-                </Card>
+          {/* Stats Cards */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <p className="text-xs text-muted-foreground">All feature requests</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.inProgress}</div>
+                <p className="text-xs text-muted-foreground">Being developed</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.completed}</div>
+                <p className="text-xs text-muted-foreground">Successfully delivered</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Upvotes</CardTitle>
+                <ThumbsUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalUpvotes}</div>
+                <p className="text-xs text-muted-foreground">Community support</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Net Votes</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalVotes}</div>
+                <p className="text-xs text-muted-foreground">Overall sentiment</p>
+              </CardContent>
+            </Card>
+          </div>
 
-                <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-3xl shadow-xl">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-green-100">Completed</p>
-                        <p className="text-3xl font-bold">{stats.completed}</p>
-                      </div>
-                      <CheckCircle className="h-12 w-12 text-green-200" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-3xl shadow-xl">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-purple-100">In Progress</p>
-                        <p className="text-3xl font-bold">{stats.in_progress}</p>
-                      </div>
-                      <Clock className="h-12 w-12 text-purple-200" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-3xl shadow-xl">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-orange-100">Total Votes</p>
-                        <p className="text-3xl font-bold">{stats.total_votes}</p>
-                      </div>
-                      <TrendingUp className="h-12 w-12 text-orange-200" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="bg-white rounded-3xl shadow-xl border-0">
-                  <CardHeader>
-                    <CardTitle>Status Distribution</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={getChartData()}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, value }) => `${name}: ${value}`}
-                        >
-                          {getChartData().map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white rounded-3xl shadow-xl border-0">
-                  <CardHeader>
-                    <CardTitle>Top Voted Features</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={getVotesChartData()}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="votes" fill="#8B5CF6" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Recent Activity */}
-              <Card className="bg-white rounded-3xl shadow-xl border-0">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    Recent Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {features
-                      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-                      .slice(0, 5)
-                      .map((feature) => (
-                        <div key={feature.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
-                          <div className="flex items-center gap-3">
-                            {getStatusIcon(feature.status)}
-                            <div>
-                              <p className="font-medium">{feature.title}</p>
-                              <p className="text-sm text-gray-500">
-                                Updated {new Date(feature.updated_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          <Badge className={statusColors[feature.status as keyof typeof statusColors]}>
-                            {feature.status.replace("_", " ")}
+          {/* Recent Features */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Feature Requests</CardTitle>
+              <CardDescription>Latest requests from the community</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {features.slice(0, 5).map((feature) => (
+                  <div
+                    key={feature.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      {getStatusIcon(feature.status)}
+                      <div className="flex-1">
+                        <h4 className="font-medium">{feature.title}</h4>
+                        <p className="text-sm text-muted-foreground line-clamp-1">{feature.description}</p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <Badge variant="outline" className={getCategoryColor(feature.category)}>
+                            {feature.category}
                           </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(feature.created_at).toLocaleDateString()}
+                          </span>
                         </div>
-                      ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-1 text-sm">
+                        <ThumbsUp className="h-3 w-3 text-green-600" />
+                        <span>{feature.upvotes || 0}</span>
+                      </div>
+                      <div className="flex items-center space-x-1 text-sm">
+                        <ThumbsDown className="h-3 w-3 text-red-600" />
+                        <span>{feature.downvotes || 0}</span>
+                      </div>
+                      <Badge className={getPriorityColor(feature.priority)}>{feature.priority}</Badge>
+                      <Badge className={getStatusColor(feature.status)}>{feature.status.replace("_", " ")}</Badge>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="features" className="space-y-6">
           {/* Filters */}
-          <Card className="bg-white rounded-3xl shadow-xl border-0">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filters
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <Label>Search</Label>
-                  <Input
-                    placeholder="Search features..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Status</Label>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="open">Open</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="planned">Planned</SelectItem>
-                      <SelectItem value="on_hold">On Hold</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Priority</Label>
-                  <Select value={filterPriority} onValueChange={setFilterPriority}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Priorities</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Category</Label>
-                  <Select value={filterCategory} onValueChange={setFilterCategory}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      <SelectItem value="feature">Features</SelectItem>
-                      <SelectItem value="enhancement">Enhancements</SelectItem>
-                      <SelectItem value="improvement">Improvements</SelectItem>
-                      <SelectItem value="integration">Integrations</SelectItem>
-                      <SelectItem value="bug">Bug Fixes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search features..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-64"
+                />
               </div>
-            </CardContent>
-          </Card>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priority</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="feature">Feature</SelectItem>
+                  <SelectItem value="enhancement">Enhancement</SelectItem>
+                  <SelectItem value="bug">Bug Fix</SelectItem>
+                  <SelectItem value="improvement">Improvement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-          {/* Feature List */}
-          <div className="space-y-4">
-            {getFilteredFeatures().map((feature) => (
-              <Card key={feature.id} className="bg-white rounded-3xl shadow-lg border-0 hover:shadow-xl transition-all">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Badge className={categoryColors[feature.category as keyof typeof categoryColors]}>
-                          {feature.category}
-                        </Badge>
-                        <Badge className={priorityColors[feature.priority as keyof typeof priorityColors]}>
-                          {feature.priority}
-                        </Badge>
-                        <Badge className={statusColors[feature.status as keyof typeof statusColors]}>
-                          {getStatusIcon(feature.status)}
-                          <span className="ml-1">{feature.status.replace("_", " ")}</span>
-                        </Badge>
-                      </div>
-                      <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                      <p className="text-gray-600 mb-3">{feature.description}</p>
-                      <div className="flex items-center space-x-4 text-sm text-gray-500">
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-1" />
-                          {feature.user_id}
-                        </div>
-                        <div className="flex items-center">
-                          <TrendingUp className="h-4 w-4 mr-1" />
-                          {feature.votes} votes
-                        </div>
-                        <div className="flex items-center">
-                          <MessageSquare className="h-4 w-4 mr-1" />
-                          {feature.comments_count || 0} comments
-                        </div>
-                        <div className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          {new Date(feature.created_at).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2 ml-4">
-                      <Select value={feature.status} onValueChange={(value) => updateFeatureStatus(feature.id, value)}>
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="open">Open</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="planned">Planned</SelectItem>
-                          <SelectItem value="on_hold">On Hold</SelectItem>
-                          <SelectItem value="rejected">Rejected</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button variant="outline" size="sm" onClick={() => setSelectedFeature(feature)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setEditingFeature(feature)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteFeature(feature.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+          {/* Features List */}
+          <div className="grid gap-4">
+            {filteredFeatures.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">No features found matching your criteria</p>
                 </CardContent>
               </Card>
-            ))}
+            ) : (
+              filteredFeatures.map((feature) => (
+                <Card key={feature.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          {getStatusIcon(feature.status)}
+                          <h3 className="font-semibold text-lg">{feature.title}</h3>
+                        </div>
+                        <p className="text-muted-foreground mb-4">{feature.description}</p>
+                        <div className="flex items-center space-x-4 mb-4">
+                          <Badge className={getPriorityColor(feature.priority)}>{feature.priority}</Badge>
+                          <Badge variant="outline" className={getCategoryColor(feature.category)}>
+                            {feature.category}
+                          </Badge>
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-1">
+                              <ThumbsUp className="h-4 w-4 text-green-600" />
+                              <span className="text-sm font-medium">{feature.upvotes || 0}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <ThumbsDown className="h-4 w-4 text-red-600" />
+                              <span className="text-sm font-medium">{feature.downvotes || 0}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span className="text-sm font-medium text-blue-600">Net: {feature.votes}</span>
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            Created {new Date(feature.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleVote(feature.id, "up")}
+                            className="flex items-center space-x-1"
+                          >
+                            <ThumbsUp className="h-3 w-3" />
+                            <span>Upvote</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleVote(feature.id, "down")}
+                            className="flex items-center space-x-1"
+                          >
+                            <ThumbsDown className="h-3 w-3" />
+                            <span>Downvote</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openViewDialog(feature)}
+                            className="flex items-center space-x-1"
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                            <span>Comments</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditDialog(feature)}
+                            className="flex items-center space-x-1"
+                          >
+                            <Edit className="h-3 w-3" />
+                            <span>Edit</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteFeature(feature.id)}
+                            className="flex items-center space-x-1"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Delete</span>
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end space-y-2">
+                        <Badge className={getStatusColor(feature.status)}>{feature.status.replace("_", " ")}</Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
-          <Card className="bg-white rounded-3xl shadow-xl border-0">
-            <CardHeader>
-              <CardTitle>Feature Request Trends</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={getTrendData()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="created" stroke="#8B5CF6" strokeWidth={2} name="Created" />
-                  <Line type="monotone" dataKey="completed" stroke="#10B981" strokeWidth={2} name="Completed" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Status Distribution</CardTitle>
+                <CardDescription>Feature requests by current status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {["pending", "submitted", "in_progress", "completed", "rejected", "on_hold"].map((status) => {
+                    const count = features.filter((f) => f.status === status).length
+                    const percentage = features.length > 0 ? (count / features.length) * 100 : 0
+                    return (
+                      <div key={status} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {getStatusIcon(status)}
+                          <span className="capitalize">{status.replace("_", " ")}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-24 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-muted-foreground w-8 text-right">{count}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
 
-        <TabsContent value="settings" className="space-y-6">
-          <Card className="bg-white rounded-3xl shadow-xl border-0">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Feature Request Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold mb-3">Notification Settings</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span>Email notifications for new features</span>
-                      <Button variant="outline" size="sm">
-                        <Bell className="h-4 w-4 mr-2" />
-                        Configure
-                      </Button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Weekly digest reports</span>
-                      <Button variant="outline" size="sm">
-                        <Mail className="h-4 w-4 mr-2" />
-                        Configure
-                      </Button>
-                    </div>
-                  </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Priority Distribution</CardTitle>
+                <CardDescription>Feature requests by priority level</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {["critical", "high", "medium", "low"].map((priority) => {
+                    const count = features.filter((f) => f.priority === priority).length
+                    const percentage = features.length > 0 ? (count / features.length) * 100 : 0
+                    const color =
+                      priority === "critical"
+                        ? "bg-red-500"
+                        : priority === "high"
+                          ? "bg-orange-500"
+                          : priority === "medium"
+                            ? "bg-blue-500"
+                            : "bg-gray-500"
+                    return (
+                      <div key={priority} className="flex items-center justify-between">
+                        <span className="capitalize">{priority}</span>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-24 bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`${color} h-2 rounded-full transition-all duration-300`}
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-muted-foreground w-8 text-right">{count}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div>
-                  <h3 className="font-semibold mb-3">Automation Rules</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span>Auto-archive old rejected features</span>
-                      <Button variant="outline" size="sm">
-                        <Archive className="h-4 w-4 mr-2" />
-                        Configure
-                      </Button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Priority escalation rules</span>
-                      <Button variant="outline" size="sm">
-                        <Flag className="h-4 w-4 mr-2" />
-                        Configure
-                      </Button>
-                    </div>
-                  </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Category Breakdown</CardTitle>
+                <CardDescription>Feature requests by category</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {["feature", "enhancement", "bug", "improvement"].map((category) => {
+                    const count = features.filter((f) => f.category === category).length
+                    const percentage = features.length > 0 ? (count / features.length) * 100 : 0
+                    return (
+                      <div key={category} className="flex items-center justify-between">
+                        <span className="capitalize">{category}</span>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-24 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-muted-foreground w-8 text-right">{count}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Voted Features</CardTitle>
+                <CardDescription>Most popular feature requests</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {features
+                    .sort((a, b) => b.votes - a.votes)
+                    .slice(0, 5)
+                    .map((feature, index) => (
+                      <div key={feature.id} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-muted-foreground">#{index + 1}</span>
+                          <span className="font-medium truncate max-w-48">{feature.title}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="secondary" className="flex items-center space-x-1">
+                            <TrendingUp className="h-3 w-3" />
+                            <span>{feature.votes}</span>
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
-      {/* Feature Details Dialog */}
-      <Dialog open={!!selectedFeature} onOpenChange={() => setSelectedFeature(null)}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Feature Request</DialogTitle>
+            <DialogDescription>Update the feature request details.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Enter feature title"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Describe the feature request"
+                rows={4}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="edit-category">Category</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value: any) => setFormData({ ...formData, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="feature">Feature</SelectItem>
+                    <SelectItem value="enhancement">Enhancement</SelectItem>
+                    <SelectItem value="bug">Bug</SelectItem>
+                    <SelectItem value="improvement">Improvement</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-priority">Priority</Label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value: any) => setFormData({ ...formData, priority: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value: any) => setFormData({ ...formData, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="submitted">Submitted</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="on_hold">On Hold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateFeature}>Update Feature Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{selectedFeature?.title}</DialogTitle>
+            <DialogDescription>Feature request details and comments</DialogDescription>
+          </DialogHeader>
           {selectedFeature && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{selectedFeature.title}</DialogTitle>
-                <DialogDescription>{selectedFeature.description}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Status</Label>
-                    <Badge className={statusColors[selectedFeature.status as keyof typeof statusColors]}>
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Badge className={getCategoryColor(selectedFeature.category)}>{selectedFeature.category}</Badge>
+                  <Badge className={getPriorityColor(selectedFeature.priority)}>{selectedFeature.priority}</Badge>
+                  <Badge className={getStatusColor(selectedFeature.status)}>
+                    <div className="flex items-center gap-1">
+                      {getStatusIcon(selectedFeature.status)}
                       {selectedFeature.status.replace("_", " ")}
-                    </Badge>
-                  </div>
-                  <div>
-                    <Label>Priority</Label>
-                    <Badge className={priorityColors[selectedFeature.priority as keyof typeof priorityColors]}>
-                      {selectedFeature.priority}
-                    </Badge>
-                  </div>
-                  <div>
-                    <Label>Category</Label>
-                    <Badge className={categoryColors[selectedFeature.category as keyof typeof categoryColors]}>
-                      {selectedFeature.category}
-                    </Badge>
-                  </div>
-                  <div>
-                    <Label>Votes</Label>
-                    <div className="flex items-center">
-                      <Star className="h-4 w-4 text-yellow-500 mr-1" />
-                      {selectedFeature.votes}
                     </div>
-                  </div>
+                  </Badge>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Submitted by</Label>
-                    <p className="text-sm text-gray-600">{selectedFeature.user_id}</p>
-                  </div>
-                  <div>
-                    <Label>Created</Label>
-                    <p className="text-sm text-gray-600">{new Date(selectedFeature.created_at).toLocaleDateString()}</p>
-                  </div>
+                <p className="text-gray-700 mb-4">{selectedFeature.description}</p>
+                <div className="flex items-center gap-6 text-sm text-gray-500">
+                  <span>Created: {new Date(selectedFeature.created_at).toLocaleDateString()}</span>
+                  <span>Updated: {new Date(selectedFeature.updated_at).toLocaleDateString()}</span>
+                  <span>Votes: {selectedFeature.votes}</span>
+                  <span>Upvotes: {selectedFeature.upvotes}</span>
+                  <span>Downvotes: {selectedFeature.downvotes}</span>
                 </div>
               </div>
-            </>
+
+              <Separator />
+
+              <div>
+                <h4 className="text-lg font-semibold mb-4">
+                  Comments ({getFeatureComments(selectedFeature.id).length})
+                </h4>
+                <ScrollArea className="h-64 mb-4">
+                  <div className="space-y-4">
+                    {getFeatureComments(selectedFeature.id).map((comment) => (
+                      <div key={comment.id} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium">{comment.user_id}</span>
+                          <span className="text-sm text-gray-500">
+                            {new Date(comment.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-gray-700">{comment.comment}</p>
+                      </div>
+                    ))}
+                    {getFeatureComments(selectedFeature.id).length === 0 && (
+                      <p className="text-gray-500 text-center py-8">No comments yet.</p>
+                    )}
+                  </div>
+                </ScrollArea>
+                <div className="flex gap-2">
+                  <Textarea
+                    placeholder="Add a comment..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    rows={3}
+                    className="flex-1"
+                  />
+                  <Button onClick={() => handleAddComment(selectedFeature.id)} disabled={!newComment.trim()}>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Add Comment
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   )
-}
-
-function getDemoFeatures(): FeatureRequest[] {
-  return [
-    {
-      id: "1",
-      title: "Advanced Booking Search",
-      description:
-        "Add more sophisticated search filters for bookings including date ranges, destinations, and price ranges.",
-      user_id: "agent@demo.com",
-      category: "enhancement",
-      priority: "high",
-      status: "in_progress",
-      votes: 15,
-      created_at: "2025-01-01T10:00:00Z",
-      updated_at: "2025-01-15T14:30:00Z",
-      comments_count: 3,
-    },
-    {
-      id: "2",
-      title: "Mobile App Integration",
-      description: "Develop a mobile application that syncs with the web platform for on-the-go access.",
-      user_id: "admin@demo.com",
-      category: "feature",
-      priority: "medium",
-      status: "open",
-      votes: 8,
-      created_at: "2025-01-02T09:15:00Z",
-      updated_at: "2025-01-10T16:45:00Z",
-      comments_count: 1,
-    },
-    {
-      id: "3",
-      title: "Real-time Notifications",
-      description: "Implement push notifications for booking updates, payment confirmations, and travel alerts.",
-      user_id: "client@demo.com",
-      category: "enhancement",
-      priority: "medium",
-      status: "open",
-      votes: 12,
-      created_at: "2025-01-03T11:20:00Z",
-      updated_at: "2025-01-12T13:10:00Z",
-      comments_count: 2,
-    },
-    {
-      id: "4",
-      title: "Multi-language Support",
-      description: "Add support for multiple languages including Dutch, German, French, and Spanish.",
-      user_id: "agent@demo.com",
-      category: "feature",
-      priority: "low",
-      status: "planned",
-      votes: 6,
-      created_at: "2025-01-04T08:30:00Z",
-      updated_at: "2025-01-08T12:00:00Z",
-      comments_count: 1,
-    },
-    {
-      id: "5",
-      title: "Automated Reporting",
-      description: "Generate automated monthly reports for agencies with booking statistics and revenue data.",
-      user_id: "admin@demo.com",
-      category: "enhancement",
-      priority: "high",
-      status: "completed",
-      votes: 20,
-      created_at: "2024-12-15T14:00:00Z",
-      updated_at: "2025-01-20T10:30:00Z",
-      comments_count: 4,
-    },
-  ]
 }

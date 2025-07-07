@@ -3,166 +3,109 @@ import { createClient } from "@/lib/supabase-client"
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
     const body = await request.json()
     const { vote_type, user_id } = body
-    const feature_id = params.id
 
-    if (!vote_type || !user_id || !feature_id) {
-      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
+    // Validation
+    if (!vote_type || !["up", "down"].includes(vote_type)) {
+      return NextResponse.json({ error: "Invalid vote type" }, { status: 400 })
     }
 
-    if (!["up", "down"].includes(vote_type)) {
-      return NextResponse.json({ success: false, error: "Invalid vote type" }, { status: 400 })
+    if (!user_id) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
+    }
+
+    const supabase = createClient()
+
+    // Check if feature request exists
+    const { data: feature, error: featureError } = await supabase
+      .from("feature_requests")
+      .select("id")
+      .eq("id", params.id)
+      .single()
+
+    if (featureError || !feature) {
+      return NextResponse.json({ error: "Feature request not found" }, { status: 404 })
     }
 
     // Check if user has already voted
-    const { data: existingVote } = await supabase
+    const { data: existingVote, error: voteCheckError } = await supabase
       .from("feature_votes")
       .select("*")
-      .eq("feature_id", feature_id)
+      .eq("feature_id", params.id)
       .eq("user_id", user_id)
       .single()
 
+    if (voteCheckError && voteCheckError.code !== "PGRST116") {
+      console.error("Error checking existing vote:", voteCheckError)
+      return NextResponse.json({ error: "Error checking existing vote" }, { status: 500 })
+    }
+
     if (existingVote) {
-      if (existingVote.vote_type === vote_type) {
-        // Remove vote if clicking the same vote type
-        const { error: deleteError } = await supabase
-          .from("feature_votes")
-          .delete()
-          .eq("feature_id", feature_id)
-          .eq("user_id", user_id)
+      // Update existing vote
+      const { error: updateError } = await supabase
+        .from("feature_votes")
+        .update({ vote_type })
+        .eq("id", existingVote.id)
 
-        if (deleteError) {
-          console.error("Delete vote error:", deleteError)
-          return NextResponse.json({ success: false, error: "Failed to remove vote" }, { status: 500 })
-        }
-      } else {
-        // Update vote type if different
-        const { error: updateError } = await supabase
-          .from("feature_votes")
-          .update({ vote_type })
-          .eq("feature_id", feature_id)
-          .eq("user_id", user_id)
-
-        if (updateError) {
-          console.error("Update vote error:", updateError)
-          return NextResponse.json({ success: false, error: "Failed to update vote" }, { status: 500 })
-        }
+      if (updateError) {
+        console.error("Error updating vote:", updateError)
+        return NextResponse.json({ error: updateError.message }, { status: 500 })
       }
     } else {
-      // Insert new vote
+      // Create new vote
       const { error: insertError } = await supabase.from("feature_votes").insert([
         {
-          feature_id,
+          feature_id: params.id,
           user_id,
           vote_type,
         },
       ])
 
       if (insertError) {
-        console.error("Insert vote error:", insertError)
-        return NextResponse.json({ success: false, error: "Failed to add vote" }, { status: 500 })
+        console.error("Error creating vote:", insertError)
+        return NextResponse.json({ error: insertError.message }, { status: 500 })
       }
     }
 
-    // Get updated vote count
-    const { data: votes } = await supabase.from("feature_votes").select("vote_type").eq("feature_id", feature_id)
-
-    const upVotes = votes?.filter((v) => v.vote_type === "up").length || 0
-    const downVotes = votes?.filter((v) => v.vote_type === "down").length || 0
-    const totalVotes = upVotes - downVotes
-
-    // Update the feature request vote count
-    await supabase.from("feature_requests").update({ votes: totalVotes }).eq("id", feature_id)
-
-    return NextResponse.json({
-      success: true,
-      votes: totalVotes,
-      user_vote: existingVote?.vote_type === vote_type ? null : vote_type,
-    })
-  } catch (error) {
-    console.error("Vote API error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const supabase = createClient()
-    const { searchParams } = new URL(request.url)
-    const user_id = searchParams.get("user_id") || "anonymous"
-    const feature_id = params.id
-
-    // Remove user's vote
-    const { error: deleteError } = await supabase
+    // Get updated vote counts
+    const { data: upvotes } = await supabase
       .from("feature_votes")
-      .delete()
-      .eq("feature_id", feature_id)
-      .eq("user_id", user_id)
+      .select("id")
+      .eq("feature_id", params.id)
+      .eq("vote_type", "up")
 
-    if (deleteError) {
-      console.error("Delete vote error:", deleteError)
-      return NextResponse.json({ error: "Failed to remove vote" }, { status: 500 })
+    const { data: downvotes } = await supabase
+      .from("feature_votes")
+      .select("id")
+      .eq("feature_id", params.id)
+      .eq("vote_type", "down")
+
+    const upvoteCount = upvotes?.length || 0
+    const downvoteCount = downvotes?.length || 0
+    const netVotes = upvoteCount - downvoteCount
+
+    // Update feature request with new vote counts
+    const { data: updatedFeature, error: updateFeatureError } = await supabase
+      .from("feature_requests")
+      .update({
+        upvotes: upvoteCount,
+        downvotes: downvoteCount,
+        votes: netVotes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", params.id)
+      .select()
+      .single()
+
+    if (updateFeatureError) {
+      console.error("Error updating feature vote counts:", updateFeatureError)
+      return NextResponse.json({ error: updateFeatureError.message }, { status: 500 })
     }
 
-    // Get updated vote count
-    const { data: votes } = await supabase.from("feature_votes").select("vote_type").eq("feature_id", feature_id)
-
-    const upVotes = votes?.filter((v) => v.vote_type === "up").length || 0
-    const downVotes = votes?.filter((v) => v.vote_type === "down").length || 0
-    const totalVotes = upVotes - downVotes
-
-    // Update feature request vote count
-    await supabase.from("feature_requests").update({ votes: totalVotes }).eq("id", feature_id)
-
-    return NextResponse.json({
-      success: true,
-      votes: totalVotes,
-      user_vote: null,
-      message: "Vote removed successfully",
-    })
+    return NextResponse.json(updatedFeature)
   } catch (error) {
-    console.error("API error:", error)
+    console.error("Error processing vote:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const supabase = createClient()
-    const { searchParams } = new URL(request.url)
-    const user_id = searchParams.get("user_id")
-    const feature_id = params.id
-
-    // Get vote counts
-    const { data: votes } = await supabase.from("feature_votes").select("vote_type").eq("feature_id", feature_id)
-
-    const upVotes = votes?.filter((v) => v.vote_type === "up").length || 0
-    const downVotes = votes?.filter((v) => v.vote_type === "down").length || 0
-    const totalVotes = upVotes - downVotes
-
-    let userVote = null
-    if (user_id) {
-      const { data: userVoteData } = await supabase
-        .from("feature_votes")
-        .select("vote_type")
-        .eq("feature_id", feature_id)
-        .eq("user_id", user_id)
-        .single()
-
-      userVote = userVoteData?.vote_type || null
-    }
-
-    return NextResponse.json({
-      success: true,
-      votes: totalVotes,
-      upVotes,
-      downVotes,
-      userVote,
-    })
-  } catch (error) {
-    console.error("Get votes API error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }

@@ -4,88 +4,93 @@ import { createClient } from "@/lib/supabase-client"
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
-    const { id } = params
 
-    const { data, error } = await supabase.from("feature_requests").select("*").eq("id", id).single()
+    const { data, error } = await supabase.from("feature_requests").select("*").eq("id", params.id).single()
 
     if (error) {
-      console.error("Database error:", error)
-      return NextResponse.json({ success: false, error: "Feature request not found" }, { status: 404 })
+      if (error.code === "PGRST116") {
+        return NextResponse.json({ error: "Feature request not found" }, { status: 404 })
+      }
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      data,
-    })
+    return NextResponse.json(data)
   } catch (error) {
-    console.error("API error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    console.error("Error fetching feature request:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const supabase = createClient()
-    const { id } = params
     const body = await request.json()
+    const { title, description, category, priority, status } = body
 
-    const allowedFields = ["status", "priority", "category", "title", "description"]
-    const updateData: Record<string, any> = {}
-
-    // Only allow updating specific fields
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field]
-      }
+    // Validation
+    if (category && !["feature", "enhancement", "bug", "improvement"].includes(category)) {
+      return NextResponse.json({ error: "Invalid category" }, { status: 400 })
     }
 
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ success: false, error: "No valid fields to update" }, { status: 400 })
+    if (priority && !["low", "medium", "high", "critical"].includes(priority)) {
+      return NextResponse.json({ error: "Invalid priority" }, { status: 400 })
     }
 
+    if (status && !["pending", "submitted", "in_progress", "completed", "rejected", "on_hold"].includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+    }
+
+    const supabase = createClient()
+
+    const updateData: any = {}
+    if (title !== undefined) updateData.title = title
+    if (description !== undefined) updateData.description = description
+    if (category !== undefined) updateData.category = category
+    if (priority !== undefined) updateData.priority = priority
+    if (status !== undefined) updateData.status = status
     updateData.updated_at = new Date().toISOString()
 
-    const { data, error } = await supabase.from("feature_requests").update(updateData).eq("id", id).select().single()
+    const { data, error } = await supabase
+      .from("feature_requests")
+      .update(updateData)
+      .eq("id", params.id)
+      .select()
+      .single()
 
     if (error) {
-      console.error("Database error:", error)
-      return NextResponse.json({ success: false, error: "Failed to update feature request" }, { status: 500 })
+      if (error.code === "PGRST116") {
+        return NextResponse.json({ error: "Feature request not found" }, { status: 404 })
+      }
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      data,
-      message: "Feature request updated successfully",
-    })
+    return NextResponse.json(data)
   } catch (error) {
-    console.error("API error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    console.error("Error updating feature request:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
-    const { id } = params
 
     // First delete related votes and comments
-    await supabase.from("feature_votes").delete().eq("feature_id", id)
-    await supabase.from("feature_comments").delete().eq("feature_id", id)
+    await supabase.from("feature_votes").delete().eq("feature_id", params.id)
+    await supabase.from("feature_comments").delete().eq("feature_id", params.id)
 
     // Then delete the feature request
-    const { error } = await supabase.from("feature_requests").delete().eq("id", id)
+    const { error } = await supabase.from("feature_requests").delete().eq("id", params.id)
 
     if (error) {
-      console.error("Database error:", error)
-      return NextResponse.json({ success: false, error: "Failed to delete feature request" }, { status: 500 })
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Feature request deleted successfully",
-    })
+    return NextResponse.json({ message: "Feature request deleted successfully" })
   } catch (error) {
-    console.error("API error:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    console.error("Error deleting feature request:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
