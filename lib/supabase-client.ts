@@ -42,16 +42,22 @@ export function getSupabaseServiceClient() {
   })
 }
 
-// Named export voor compatibility
-export const createClient = () => createSupabaseClient(supabaseUrl, supabaseAnonKey)
+// Client-side Supabase client creation function
+export function createClient() {
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
+}
 
 // Server-side client creation function
-export const createServerClient = () => {
+export function createServerClient() {
   if (!supabaseServiceKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable")
+    console.warn("Missing SUPABASE_SERVICE_ROLE_KEY, falling back to anon key")
+    return createSupabaseClient(supabaseUrl, supabaseAnonKey)
   }
   return createSupabaseClient(supabaseUrl, supabaseServiceKey)
 }
+
+// Default export for backward compatibility
+export default createClient()
 
 // Database types
 export type Database = {
