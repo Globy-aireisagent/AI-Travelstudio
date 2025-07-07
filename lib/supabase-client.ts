@@ -85,3 +85,5 @@ export interface TravelIdea {
   created_at: string
   updated_at: string
 }
+
+export { createClient }

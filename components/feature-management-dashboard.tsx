@@ -1170,3 +1170,5 @@ export function FeatureManagementDashboard() {
     </div>
   )
 }
+
+export default FeatureManagementDashboard
