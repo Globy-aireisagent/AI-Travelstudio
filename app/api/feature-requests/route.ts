@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase-client"
+import { createServerClient } from "@/lib/supabase-client"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = createServerClient()
 
     const { data, error } = await supabase
       .from("feature_requests")
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data || [])
   } catch (error) {
     console.error("Error fetching feature requests:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -32,28 +32,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Title and description are required" }, { status: 400 })
     }
 
-    if (!["feature", "enhancement", "bug", "improvement"].includes(category)) {
+    // Validate category
+    const validCategories = ["ai", "mobile", "feature", "ui", "analytics", "technical", "integration", "general"]
+    if (category && !validCategories.includes(category)) {
       return NextResponse.json({ error: "Invalid category" }, { status: 400 })
     }
 
-    if (!["low", "medium", "high", "critical"].includes(priority)) {
+    // Validate priority
+    const validPriorities = ["low", "medium", "high", "urgent", "critical"]
+    if (priority && !validPriorities.includes(priority)) {
       return NextResponse.json({ error: "Invalid priority" }, { status: 400 })
     }
 
-    if (!["pending", "submitted", "in_progress", "completed", "rejected", "on_hold"].includes(status)) {
+    // Validate status
+    const validStatuses = ["pending", "submitted", "in_progress", "completed", "rejected", "on_hold"]
+    if (status && !validStatuses.includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
-    const supabase = createClient()
+    const supabase = createServerClient()
 
     const { data, error } = await supabase
       .from("feature_requests")
       .insert([
         {
-          title,
-          description,
-          category,
-          priority,
+          title: title.trim(),
+          description: description.trim(),
+          category: category || "feature",
+          priority: priority || "medium",
           status: status || "pending",
           created_by: created_by || "anonymous",
           user_id: user_id || null,

@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -11,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Send, Lightbulb, CheckCircle, AlertCircle } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
 export default function FeatureRequestPage() {
   const router = useRouter()
@@ -21,8 +21,8 @@ export default function FeatureRequestPage() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    category: "",
-    priority: "",
+    category: "feature",
+    priority: "medium",
     submitterName: "",
     submitterEmail: "",
   })
@@ -54,13 +54,34 @@ export default function FeatureRequestPage() {
     setIsSubmitting(true)
     setError("")
 
+    // Validation
+    if (!formData.title.trim()) {
+      setError("Titel is verplicht")
+      setIsSubmitting(false)
+      return
+    }
+
+    if (!formData.description.trim()) {
+      setError("Beschrijving is verplicht")
+      setIsSubmitting(false)
+      return
+    }
+
     try {
       const response = await fetch("/api/feature-requests", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          priority: formData.priority,
+          status: "pending",
+          created_by: formData.submitterName || "Anonymous",
+          user_id: formData.submitterEmail || null,
+        }),
       })
 
       if (!response.ok) {
@@ -68,10 +89,23 @@ export default function FeatureRequestPage() {
         throw new Error(errorData.error || "Failed to submit feature request")
       }
 
+      const result = await response.json()
+      console.log("Feature request created:", result)
+
       setSubmitted(true)
+      toast({
+        title: "Success!",
+        description: "Je feature request is succesvol ingediend.",
+      })
     } catch (error) {
       console.error("Error submitting feature request:", error)
-      setError(error instanceof Error ? error.message : "Er is een fout opgetreden")
+      const errorMessage = error instanceof Error ? error.message : "Er is een fout opgetreden"
+      setError(errorMessage)
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -84,7 +118,7 @@ export default function FeatureRequestPage() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-green-50 flex items-center justify-center p-6">
-        <Card className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-0">
+        <Card className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-gray-200">
           <CardContent className="p-12 text-center">
             <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
               <CheckCircle className="h-10 w-10 text-white" />
@@ -108,14 +142,14 @@ export default function FeatureRequestPage() {
                   setFormData({
                     title: "",
                     description: "",
-                    category: "",
-                    priority: "",
+                    category: "feature",
+                    priority: "medium",
                     submitterName: "",
                     submitterEmail: "",
                   })
                 }}
                 variant="outline"
-                className="rounded-2xl px-8 py-3"
+                className="rounded-2xl px-8 py-3 bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
               >
                 Nog een Request Indienen
               </Button>
@@ -129,12 +163,12 @@ export default function FeatureRequestPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b shadow-sm sticky top-0 z-50">
+      <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Link href="/agent-dashboard">
-                <Button variant="ghost" size="sm" className="rounded-2xl">
+                <Button variant="ghost" size="sm" className="rounded-2xl hover:bg-gray-100">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Terug
                 </Button>
@@ -154,18 +188,18 @@ export default function FeatureRequestPage() {
       </header>
 
       <main className="container mx-auto p-6 max-w-4xl">
-        <Card className="bg-white rounded-3xl shadow-2xl border-0">
+        <Card className="bg-white rounded-3xl shadow-2xl border border-gray-200">
           <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-3xl">
             <CardTitle className="text-2xl">Nieuw Feature Request</CardTitle>
             <CardDescription className="text-purple-100">
               Help ons AI Travel Studio te verbeteren door je ideeën te delen
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-8">
+          <CardContent className="p-8 bg-white">
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3">
                 <AlertCircle className="h-5 w-5 text-red-600" />
-                <p className="text-red-700">{error}</p>
+                <p className="text-red-700 font-medium">{error}</p>
               </div>
             )}
 
@@ -174,42 +208,50 @@ export default function FeatureRequestPage() {
               <div className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="submitterName">Je Naam</Label>
+                    <Label htmlFor="submitterName" className="text-gray-700 font-medium">
+                      Je Naam
+                    </Label>
                     <Input
                       id="submitterName"
                       value={formData.submitterName}
                       onChange={(e) => handleInputChange("submitterName", e.target.value)}
                       placeholder="Bijv. Jan de Vries"
-                      className="rounded-2xl"
+                      className="rounded-2xl bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="submitterEmail">Email Adres</Label>
+                    <Label htmlFor="submitterEmail" className="text-gray-700 font-medium">
+                      Email Adres
+                    </Label>
                     <Input
                       id="submitterEmail"
                       type="email"
                       value={formData.submitterEmail}
                       onChange={(e) => handleInputChange("submitterEmail", e.target.value)}
                       placeholder="jan@reisbureau.nl"
-                      className="rounded-2xl"
+                      className="rounded-2xl bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="title">Feature Titel *</Label>
+                  <Label htmlFor="title" className="text-gray-700 font-medium">
+                    Feature Titel *
+                  </Label>
                   <Input
                     id="title"
                     value={formData.title}
                     onChange={(e) => handleInputChange("title", e.target.value)}
                     placeholder="Bijv. AI Hotel Aanbevelingen op basis van klantvoorkeuren"
                     required
-                    className="rounded-2xl"
+                    className="rounded-2xl bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Beschrijving *</Label>
+                  <Label htmlFor="description" className="text-gray-700 font-medium">
+                    Beschrijving *
+                  </Label>
                   <Textarea
                     id="description"
                     value={formData.description}
@@ -217,26 +259,26 @@ export default function FeatureRequestPage() {
                     placeholder="Beschrijf je feature idee in detail. Wat moet het doen? Hoe zou het werken? Welk probleem lost het op?"
                     required
                     rows={6}
-                    className="rounded-2xl"
+                    className="rounded-2xl bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                   />
                 </div>
               </div>
 
               {/* Category Selection */}
               <div className="space-y-4">
-                <Label>Categorie *</Label>
+                <Label className="text-gray-700 font-medium">Categorie *</Label>
                 <div className="grid gap-3 md:grid-cols-2">
                   {categories.map((category) => (
                     <div
                       key={category.value}
                       onClick={() => handleInputChange("category", category.value)}
-                      className={`p-4 border-2 rounded-2xl cursor-pointer transition-all duration-300 hover:shadow-lg ${
+                      className={`p-4 border-2 rounded-2xl cursor-pointer transition-all duration-300 hover:shadow-lg bg-white ${
                         formData.category === category.value
-                          ? "border-purple-500 bg-purple-50 shadow-lg"
-                          : "border-gray-200 hover:border-purple-300"
+                          ? "border-purple-500 bg-purple-50 shadow-lg ring-2 ring-purple-200"
+                          : "border-gray-200 hover:border-purple-300 hover:bg-gray-50"
                       }`}
                     >
-                      <div className="font-medium text-sm">{category.label}</div>
+                      <div className="font-medium text-sm text-gray-800">{category.label}</div>
                       <div className="text-xs text-gray-600 mt-1">{category.description}</div>
                     </div>
                   ))}
@@ -245,19 +287,19 @@ export default function FeatureRequestPage() {
 
               {/* Priority Selection */}
               <div className="space-y-4">
-                <Label>Prioriteit *</Label>
+                <Label className="text-gray-700 font-medium">Prioriteit *</Label>
                 <div className="grid gap-3 md:grid-cols-2">
                   {priorities.map((priority) => (
                     <div
                       key={priority.value}
                       onClick={() => handleInputChange("priority", priority.value)}
-                      className={`p-4 border-2 rounded-2xl cursor-pointer transition-all duration-300 hover:shadow-lg ${
+                      className={`p-4 border-2 rounded-2xl cursor-pointer transition-all duration-300 hover:shadow-lg bg-white ${
                         formData.priority === priority.value
-                          ? "border-purple-500 bg-purple-50 shadow-lg"
-                          : "border-gray-200 hover:border-purple-300"
+                          ? "border-purple-500 bg-purple-50 shadow-lg ring-2 ring-purple-200"
+                          : "border-gray-200 hover:border-purple-300 hover:bg-gray-50"
                       }`}
                     >
-                      <div className="font-medium text-sm">{priority.label}</div>
+                      <div className="font-medium text-sm text-gray-800">{priority.label}</div>
                       <div className="text-xs text-gray-600 mt-1">{priority.description}</div>
                     </div>
                   ))}
@@ -268,10 +310,8 @@ export default function FeatureRequestPage() {
               <div className="flex gap-4 pt-6">
                 <Button
                   type="submit"
-                  disabled={
-                    isSubmitting || !formData.title || !formData.description || !formData.category || !formData.priority
-                  }
-                  className="flex-1 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105 py-3"
+                  disabled={isSubmitting || !formData.title || !formData.description}
+                  className="flex-1 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105 py-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
                 >
                   {isSubmitting ? (
                     <>
@@ -286,7 +326,11 @@ export default function FeatureRequestPage() {
                   )}
                 </Button>
                 <Link href="/agent-dashboard">
-                  <Button variant="outline" className="rounded-2xl px-8 py-3 bg-transparent">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-2xl px-8 py-3 bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
                     Annuleren
                   </Button>
                 </Link>
