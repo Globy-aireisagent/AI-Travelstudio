@@ -1,10 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSupabaseServiceClient } from "@/lib/supabase-client"
+import { getSqlClient, isDatabaseAvailable } from "@/lib/neon-client"
 import { UniversalTravelImporter } from "@/lib/universal-travel-importer"
 
 export async function POST(request: NextRequest) {
   try {
     console.log("📋 Starting user bookings import...")
+
+    // Check if database is available
+    if (!isDatabaseAvailable) {
+      return NextResponse.json(
+        {
+          error: "Database not configured - check DATABASE_URL environment variable",
+          demo: true,
+        },
+        { status: 500 },
+      )
+    }
 
     const { userId, userEmail, micrositeId, limit = 50 } = await request.json()
 
@@ -12,13 +23,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User ID and email required" }, { status: 400 })
     }
 
-    const supabase = getSupabaseServiceClient()
+    const sql = getSqlClient()
     const importer = new UniversalTravelImporter()
 
     // 1. Haal user op uit database
-    const { data: user, error: userError } = await supabase.from("users").select("*").eq("id", userId).single()
+    const users = await sql`SELECT * FROM users WHERE id = ${userId}`
+    const user = users[0]
 
-    if (userError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
@@ -47,12 +59,12 @@ export async function POST(request: NextRequest) {
       console.log(`⚠️ Limited to ${limit} bookings`)
     }
 
-    // 4. Importeer bookings naar Supabase
+    // 4. Importeer bookings naar database
     const importResults = []
 
     for (const booking of allBookings) {
       try {
-        const result = await importBookingToDatabase(booking, user, supabase)
+        const result = await importBookingToDatabase(booking, user, sql)
         importResults.push(result)
       } catch (error) {
         console.error(`❌ Failed to import booking ${booking.id}:`, error)
@@ -91,17 +103,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function importBookingToDatabase(booking: any, user: any, supabase: any) {
+async function importBookingToDatabase(booking: any, user: any, sql: any) {
   try {
     // Check of booking al bestaat
-    const { data: existingBooking } = await supabase
-      .from("bookings")
-      .select("id")
-      .eq("tc_booking_id", booking.id || booking.bookingId)
-      .eq("microsite_id", booking.microsite_id)
-      .single()
+    const existingBookings = await sql`
+      SELECT id FROM bookings 
+      WHERE tc_booking_id = ${booking.id || booking.bookingId}
+      AND microsite_id = ${booking.microsite_id}
+    `
 
-    if (existingBooking) {
+    if (existingBookings.length > 0) {
       return {
         success: false,
         bookingId: booking.id,
@@ -125,18 +136,16 @@ async function importBookingToDatabase(booking: any, user: any, supabase: any) {
       client_phone: booking.client?.phone || booking.clientPhone,
       total_price: extractPrice(booking),
       currency: booking.currency || "EUR",
-      accommodations: booking.accommodations || booking.hotels || [],
-      activities: booking.activities || booking.tickets || [],
-      transports: booking.transports || [],
-      vouchers: booking.vouchers || booking.transfers || [],
-      original_data: booking,
+      accommodations: JSON.stringify(booking.accommodations || booking.hotels || []),
+      activities: JSON.stringify(booking.activities || booking.tickets || []),
+      transports: JSON.stringify(booking.transports || []),
+      vouchers: JSON.stringify(booking.vouchers || booking.transfers || []),
+      original_data: JSON.stringify(booking),
     }
 
-    const { error: insertError } = await supabase.from("bookings").insert(bookingData)
-
-    if (insertError) {
-      throw new Error(`Database insert failed: ${insertError.message}`)
-    }
+    await sql`
+      INSERT INTO bookings ${sql(bookingData)}
+    `
 
     return {
       success: true,

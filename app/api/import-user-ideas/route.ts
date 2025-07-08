@@ -1,10 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSupabaseServiceClient } from "@/lib/supabase-client"
+import { getSqlClient, isDatabaseAvailable } from "@/lib/neon-client"
 import { UniversalTravelImporter } from "@/lib/universal-travel-importer"
 
 export async function POST(request: NextRequest) {
   try {
     console.log("💡 Starting user travel ideas import...")
+
+    // Check if database is available
+    if (!isDatabaseAvailable) {
+      return NextResponse.json(
+        {
+          error: "Database not configured - check DATABASE_URL environment variable",
+          demo: true,
+        },
+        { status: 500 },
+      )
+    }
 
     const { userId, userEmail, micrositeId, limit = 50 } = await request.json()
 
@@ -12,13 +23,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User ID and email required" }, { status: 400 })
     }
 
-    const supabase = getSupabaseServiceClient()
+    const sql = getSqlClient()
     const importer = new UniversalTravelImporter()
 
     // 1. Haal user op
-    const { data: user, error: userError } = await supabase.from("users").select("*").eq("id", userId).single()
+    const users = await sql`SELECT * FROM users WHERE id = ${userId}`
+    const user = users[0]
 
-    if (userError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
@@ -52,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     for (const idea of allIdeas) {
       try {
-        const result = await importIdeaToDatabase(idea, user, supabase)
+        const result = await importIdeaToDatabase(idea, user, sql)
         importResults.push(result)
       } catch (error) {
         console.error(`❌ Failed to import idea ${idea.id}:`, error)
@@ -91,17 +103,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function importIdeaToDatabase(idea: any, user: any, supabase: any) {
+async function importIdeaToDatabase(idea: any, user: any, sql: any) {
   try {
     // Check of idea al bestaat
-    const { data: existing } = await supabase
-      .from("travel_ideas")
-      .select("id")
-      .eq("tc_idea_id", idea.id || idea.ideaId)
-      .eq("microsite_id", idea.microsite_id)
-      .single()
+    const existing = await sql`
+      SELECT id FROM travel_ideas 
+      WHERE tc_idea_id = ${idea.id || idea.ideaId}
+      AND microsite_id = ${idea.microsite_id}
+    `
 
-    if (existing) {
+    if (existing.length > 0) {
       return {
         success: false,
         ideaId: idea.id,
@@ -119,26 +130,21 @@ async function importIdeaToDatabase(idea: any, user: any, supabase: any) {
       image_url: idea.imageUrl || idea.image || "",
       creation_date: idea.creationDate || idea.created,
       departure_date: idea.departureDate || idea.departure,
-      price_per_person: extractPriceObject(idea.pricePerPerson),
-      total_price: extractPriceObject(idea.totalPrice),
-      themes: idea.themes || [],
-      destinations: idea.destinations || [],
-      customer: idea.customer || {},
-      counters: idea.counters || {},
-      original_data: idea,
+      price_per_person: JSON.stringify(extractPriceObject(idea.pricePerPerson)),
+      total_price: JSON.stringify(extractPriceObject(idea.totalPrice)),
+      themes: JSON.stringify(idea.themes || []),
+      destinations: JSON.stringify(idea.destinations || []),
+      customer: JSON.stringify(idea.customer || {}),
+      counters: JSON.stringify(idea.counters || {}),
+      original_data: JSON.stringify(idea),
     }
 
     // Insert idea
-    const { data: newIdea, error: insertError } = await supabase.from("travel_ideas").insert(ideaData).select().single()
-
-    if (insertError) {
-      throw new Error(`Database insert failed: ${insertError.message}`)
-    }
+    await sql`INSERT INTO travel_ideas ${sql(ideaData)}`
 
     return {
       success: true,
       ideaId: idea.id,
-      databaseId: newIdea.id,
     }
   } catch (error) {
     return {

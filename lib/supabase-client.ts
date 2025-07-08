@@ -5,21 +5,17 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-if (!supabaseUrl) {
-  throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable")
-}
-
-if (!supabaseAnonKey) {
-  throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable")
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn("⚠️  Supabase env vars missing - running in demo mode (no live DB calls)")
 }
 
 // Client-side Supabase client (uses anon key)
-export const supabase = _createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-})
+export const supabase =
+  supabaseUrl && supabaseAnonKey
+    ? _createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: true, autoRefreshToken: true },
+      })
+    : null
 
 // Server-side Supabase client (uses service role key)
 export const supabaseAdmin = supabaseServiceKey
@@ -37,7 +33,7 @@ export const supabaseAdmin = supabaseServiceKey
  */
 export function getSupabaseServiceClient() {
   if (!supabaseServiceKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable")
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY missing – getSupabaseServiceClient() cannot be used in demo mode.")
   }
   return _createSupabaseClient(supabaseUrl, supabaseServiceKey, {
     auth: {

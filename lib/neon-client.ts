@@ -1,123 +1,128 @@
 import { neon } from "@neondatabase/serverless"
 
-// Create Neon client with proper error handling
-export function createNeonClient() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set")
-  }
+// Get DATABASE_URL from environment
+const databaseUrl = process.env.DATABASE_URL
 
-  return neon(process.env.DATABASE_URL)
-}
+// Create SQL client if DATABASE_URL is available
+export const sql = databaseUrl ? neon(databaseUrl) : null
 
-// ------------------------
-// Singleton SQL client
-// ------------------------
-export const sql = createNeonClient()
-
-// Safe query execution with detailed error handling
+/**
+ * Wrap any DB call in a try/catch and always return a uniform result
+ * so that pages and API routes don’t have to duplicate error-handling logic.
+ */
 export async function safeQuery<T = any>(
-  queryFn: () => Promise<T[]>,
+  query: () => Promise<T[]>,
   fallback: T[] = [],
 ): Promise<{ success: boolean; data: T[]; error?: string }> {
+  if (!isDatabaseAvailable) {
+    return { success: false, data: fallback, error: "Database not configured (demo mode)" }
+  }
+
   try {
-    const data = await queryFn()
+    const data = await query()
     return { success: true, data }
-  } catch (error) {
-    console.error("Database query failed:", error)
-
-    let errorMessage = "Unknown database error"
-    if (error instanceof Error) {
-      errorMessage = error.message
-    }
-
+  } catch (err) {
+    console.error("Neon query error:", err)
     return {
       success: false,
       data: fallback,
-      error: errorMessage,
+      error: err instanceof Error ? err.message : "Unknown database error",
     }
   }
 }
 
-// Test connection with comprehensive error handling
-export async function testNeonConnection() {
+// Check if database is available
+export const isDatabaseAvailable = !!databaseUrl
+
+// Demo mode fallback
+export function createDemoClient() {
+  console.warn("⚠️ Running in demo mode - no real database connection")
+  return {
+    query: async () => ({ rows: [], rowCount: 0 }),
+    end: async () => {},
+  }
+}
+
+// Get SQL client with fallback
+export function getSqlClient() {
+  if (!isDatabaseAvailable) {
+    throw new Error("Database not available - check DATABASE_URL environment variable")
+  }
+  return sql!
+}
+
+// Test database connection
+export async function testConnection() {
   try {
-    if (!process.env.DATABASE_URL) {
+    if (!isDatabaseAvailable) {
       return {
         success: false,
         error: "DATABASE_URL not configured",
-        setup_needed: true,
+        demo: true,
       }
     }
 
-    const sql = createNeonClient()
-    const result = await sql`SELECT NOW() as current_time, 'Connected!' as status`
-
+    const result = await sql!`SELECT NOW() as current_time`
     return {
       success: true,
-      data: result[0],
-      timestamp: result[0].current_time,
+      timestamp: result[0]?.current_time,
+      demo: false,
     }
   } catch (error) {
-    console.error("Connection test failed:", error)
-
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Connection failed",
-      setup_needed: true,
+      error: error instanceof Error ? error.message : "Unknown error",
+      demo: false,
     }
   }
 }
 
-// Get table information
-export async function getNeonTables() {
+// Get database info
+export async function getDatabaseInfo() {
   try {
-    const sql = createNeonClient()
+    if (!isDatabaseAvailable) {
+      return {
+        tables: [],
+        demo: true,
+      }
+    }
 
-    const tables = await sql`
-      SELECT table_name 
-      FROM information_schema.tables 
+    const tables = await sql!`
+      SELECT table_name, 
+             (SELECT COUNT(*) FROM information_schema.columns WHERE table_name = t.table_name) as column_count
+      FROM information_schema.tables t
       WHERE table_schema = 'public'
       ORDER BY table_name
     `
 
+    const tableInfo = []
+    for (const table of tables) {
+      try {
+        const countResult = await sql!`SELECT COUNT(*) as count FROM ${sql!.unsafe(table.table_name)}`
+        tableInfo.push({
+          name: table.table_name,
+          columns: table.column_count,
+          rows: Number.parseInt(countResult[0]?.count || "0"),
+        })
+      } catch (error) {
+        tableInfo.push({
+          name: table.table_name,
+          columns: table.column_count,
+          rows: 0,
+          error: "Could not count rows",
+        })
+      }
+    }
+
     return {
-      success: true,
-      data: tables.map((row) => row.table_name),
+      tables: tableInfo,
+      demo: false,
     }
   } catch (error) {
     return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to get tables",
-      data: [],
+      tables: [],
+      error: error instanceof Error ? error.message : "Unknown error",
+      demo: false,
     }
-  }
-}
-
-// Execute raw SQL safely
-export async function executeSQL(query: string, params: any[] = []) {
-  try {
-    const sql = createNeonClient()
-    const result = await sql(query, params)
-    return { success: true, data: result }
-  } catch (error) {
-    console.error("SQL execution failed:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "SQL execution failed",
-      data: [],
-    }
-  }
-}
-
-// ------------------------
-// Simple availability check
-// ------------------------
-export async function isDatabaseAvailable(): Promise<boolean> {
-  try {
-    // A lightweight query – doesn’t hit any user tables.
-    await sql`SELECT 1`
-    return true
-  } catch {
-    return false
   }
 }
