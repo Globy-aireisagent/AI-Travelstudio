@@ -1,145 +1,115 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getSupabaseServiceClient } from "@/lib/supabase-client"
+import { NextResponse } from "next/server"
+import { getSupabaseServiceClient, supabase } from "@/lib/supabase-client"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const supabase = getSupabaseServiceClient()
+    console.log("🧪 Testing Supabase connection...")
 
-    // Test database connection
-    const { data: agencies, error: agenciesError } = await supabase.from("agencies").select("*").limit(5)
-
-    if (agenciesError) {
-      console.error("Agencies query error:", agenciesError)
+    // Test environment variables
+    const envCheck = {
+      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     }
 
-    const { data: users, error: usersError } = await supabase.from("users").select("*").limit(5)
+    console.log("🔑 Environment variables:", envCheck)
 
-    if (usersError) {
-      console.error("Users query error:", usersError)
+    // Test client-side connection
+    let clientTest = { success: false, error: null }
+    try {
+      const { data, error } = await supabase.from("users").select("count").limit(1)
+      if (error) throw error
+      clientTest = { success: true, error: null }
+      console.log("✅ Client connection successful")
+    } catch (error) {
+      clientTest = { success: false, error: error.message }
+      console.log("❌ Client connection failed:", error.message)
     }
 
-    const { data: featureRequests, error: featuresError } = await supabase.from("feature_requests").select("*").limit(5)
-
-    if (featuresError) {
-      console.error("Feature requests query error:", featuresError)
+    // Test server-side connection
+    let serverTest = { success: false, error: null }
+    try {
+      const supabaseServer = getSupabaseServiceClient()
+      const { data, error } = await supabaseServer.from("users").select("count").limit(1)
+      if (error) throw error
+      serverTest = { success: true, error: null }
+      console.log("✅ Server connection successful")
+    } catch (error) {
+      serverTest = { success: false, error: error.message }
+      console.log("❌ Server connection failed:", error.message)
     }
 
-    const { data: bookings, error: bookingsError } = await supabase.from("bookings").select("*").limit(5)
+    // Test database tables
+    let tablesTest = { success: false, tables: [], error: null }
+    try {
+      const supabaseServer = getSupabaseServiceClient()
 
-    if (bookingsError) {
-      console.error("Bookings query error:", bookingsError)
+      const tables = [
+        "users",
+        "bookings",
+        "travel_ideas",
+        "feature_requests",
+        "feature_votes",
+        "feature_comments",
+        "webhook_events",
+        "agencies",
+      ]
+
+      const tableResults = []
+
+      for (const table of tables) {
+        try {
+          const { data, error } = await supabaseServer.from(table).select("count").limit(1)
+          tableResults.push({
+            name: table,
+            exists: !error,
+            error: error?.message || null,
+          })
+        } catch (err) {
+          tableResults.push({
+            name: table,
+            exists: false,
+            error: err.message,
+          })
+        }
+      }
+
+      tablesTest = {
+        success: true,
+        tables: tableResults,
+        error: null,
+      }
+      console.log("✅ Tables test completed")
+    } catch (error) {
+      tablesTest = { success: false, tables: [], error: error.message }
+      console.log("❌ Tables test failed:", error.message)
     }
-
-    // Test table existence
-    const { data: tables, error: tablesError } = await supabase.rpc("exec_sql", {
-      sql: `
-          SELECT table_name 
-          FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          ORDER BY table_name
-        `,
-    })
 
     return NextResponse.json({
       success: true,
-      message: "Supabase connection successful",
-      data: {
-        agencies: {
-          count: agencies?.length || 0,
-          data: agencies,
-          error: agenciesError?.message,
-        },
-        users: {
-          count: users?.length || 0,
-          data: users,
-          error: usersError?.message,
-        },
-        featureRequests: {
-          count: featureRequests?.length || 0,
-          data: featureRequests,
-          error: featuresError?.message,
-        },
-        bookings: {
-          count: bookings?.length || 0,
-          data: bookings,
-          error: bookingsError?.message,
-        },
-        tables: {
-          data: tables,
-          error: tablesError?.message,
-        },
+      timestamp: new Date().toISOString(),
+      environment: envCheck,
+      tests: {
+        client: clientTest,
+        server: serverTest,
+        tables: tablesTest,
       },
-      environment: {
-        hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + "...",
-      },
+      recommendations: [
+        !envCheck.NEXT_PUBLIC_SUPABASE_URL && "Add NEXT_PUBLIC_SUPABASE_URL to environment variables",
+        !envCheck.NEXT_PUBLIC_SUPABASE_ANON_KEY && "Add NEXT_PUBLIC_SUPABASE_ANON_KEY to environment variables",
+        !envCheck.SUPABASE_SERVICE_ROLE_KEY && "Add SUPABASE_SERVICE_ROLE_KEY to environment variables",
+        !clientTest.success && "Fix client-side Supabase connection",
+        !serverTest.success && "Fix server-side Supabase connection",
+        !tablesTest.success && "Check database table setup",
+      ].filter(Boolean),
     })
   } catch (error) {
-    console.error("Supabase test error:", error)
+    console.error("❌ Supabase test failed:", error)
     return NextResponse.json(
       {
         success: false,
-        message: "Supabase connection failed",
-        error: error instanceof Error ? error.message : "Unknown error",
-        environment: {
-          hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-          hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-          hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + "...",
-        },
-      },
-      { status: 500 },
-    )
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = getSupabaseServiceClient()
-    const body = await request.json()
-
-    // Test inserting a test record
-    const { data, error } = await supabase
-      .from("feature_requests")
-      .insert({
-        title: "Test Feature Request",
-        description: "This is a test feature request to verify Supabase is working",
-        user_id: "test-user",
-        category: "feature",
-        priority: "low",
-        status: "open",
-      })
-      .select()
-      .single()
-
-    if (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Failed to insert test data",
-          error: error.message,
-        },
-        { status: 500 },
-      )
-    }
-
-    // Clean up test data
-    await supabase.from("feature_requests").delete().eq("id", data.id)
-
-    return NextResponse.json({
-      success: true,
-      message: "Supabase write test successful",
-      data: data,
-    })
-  } catch (error) {
-    console.error("Supabase write test error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Supabase write test failed",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error.message,
+        timestamp: new Date().toISOString(),
       },
       { status: 500 },
     )

@@ -1,7 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+import { getSupabaseServiceClient } from "@/lib/supabase-client"
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,9 +11,10 @@ export async function GET(request: NextRequest) {
 
     console.log(`📋 Fetching bookings (limit: ${limit}, offset: ${offset})`)
 
+    const supabase = getSupabaseServiceClient()
     let query = supabase
       .from("bookings")
-      .select("*")
+      .select("*", { count: "exact" })
       .order("webhook_received_at", { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -42,10 +41,10 @@ export async function GET(request: NextRequest) {
         data?.map((booking) => ({
           id: booking.id,
           bookingReference: booking.booking_reference,
-          title: booking.title,
+          title: booking.title || "Untitled Booking",
           client: {
-            name: booking.client_name,
-            email: booking.client_email,
+            name: booking.client_name || "Unknown Client",
+            email: booking.client_email || "",
           },
           destination: booking.destination,
           startDate: booking.start_date,

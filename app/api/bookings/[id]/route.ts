@@ -1,13 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+import { getSupabaseServiceClient } from "@/lib/supabase-client"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const bookingId = params.id
     console.log(`🔍 Fetching booking: ${bookingId}`)
 
+    const supabase = getSupabaseServiceClient()
     const { data, error } = await supabase.from("bookings").select("*").eq("id", bookingId).single()
 
     if (error) {
@@ -26,11 +25,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       booking: {
         id: data.id,
         bookingReference: data.booking_reference,
-        title: data.title,
+        title: data.title || "Untitled Booking",
         client: {
-          name: data.client_name,
-          email: data.client_email,
-          phone: data.client_phone,
+          name: data.client_name || "Unknown Client",
+          email: data.client_email || "",
+          phone: data.client_phone || "",
         },
         destination: data.destination,
         startDate: data.start_date,
