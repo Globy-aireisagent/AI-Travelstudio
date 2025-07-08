@@ -4,7 +4,6 @@ SELECT
     table_type
 FROM information_schema.tables 
 WHERE table_schema = 'public' 
-    AND table_name IN ('users', 'agencies', 'bookings', 'travel_ideas', 'feature_requests', 'feature_votes', 'feature_comments', 'webhook_events')
 ORDER BY table_name;
 
 -- Check table row counts
@@ -32,6 +31,18 @@ UNION ALL
 SELECT 
     'webhook_events' as table_name, COUNT(*) as row_count FROM webhook_events;
 
+-- Test a sample query to verify relationships work
+SELECT 
+    u.name as user_name,
+    u.role,
+    a.name as agency_name,
+    COUNT(fr.id) as feature_requests_created
+FROM users u
+LEFT JOIN agencies a ON u.agency_id = a.id
+LEFT JOIN feature_requests fr ON u.id = fr.user_id
+GROUP BY u.id, u.name, u.role, a.name
+ORDER BY u.name;
+
 -- Verify foreign key relationships
 SELECT 
     tc.table_name, 
@@ -49,14 +60,3 @@ FROM
 WHERE tc.constraint_type = 'FOREIGN KEY' 
     AND tc.table_schema = 'public'
 ORDER BY tc.table_name, kcu.column_name;
-
--- Check indexes
-SELECT 
-    schemaname,
-    tablename,
-    indexname,
-    indexdef
-FROM pg_indexes 
-WHERE schemaname = 'public'
-    AND tablename IN ('users', 'agencies', 'bookings', 'travel_ideas', 'feature_requests', 'feature_votes', 'feature_comments')
-ORDER BY tablename, indexname;

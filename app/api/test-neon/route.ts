@@ -1,99 +1,97 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { sql, isDatabaseAvailable } from "@/lib/neon-client"
+import { NextResponse } from "next/server"
+import { neon } from "@neondatabase/serverless"
 
-export async function GET(request: NextRequest) {
-  const result = {
-    success: false,
-    configured: false,
-    connected: false,
-    error: null as string | null,
-    database_info: null as any,
-    table_counts: null as any,
-    sample_data: null as any,
-    errors: {} as any,
-  }
-
+export async function GET() {
   try {
-    // Check if database is configured
-    result.configured = isDatabaseAvailable()
-
-    if (!result.configured) {
-      result.error = "DATABASE_URL environment variable not found"
-      return NextResponse.json(result)
+    // Check if DATABASE_URL is configured
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({
+        success: false,
+        setup_needed: true,
+        message: "DATABASE_URL not configured - using demo mode",
+        troubleshooting: [
+          "Add DATABASE_URL to your Vercel environment variables",
+          "Get your connection string from Neon dashboard",
+          "Format: postgresql://username:password@hostname/database?sslmode=require",
+        ],
+      })
     }
 
     // Test basic connection
-    try {
-      const { rows: timeRows } = await sql`SELECT NOW() as current_time, version() as db_version`
-      result.connected = true
-      result.database_info = {
-        current_time: timeRows[0]?.current_time,
-        db_version: timeRows[0]?.db_version,
+    const sql = neon(process.env.DATABASE_URL)
+
+    // Simple query first
+    const timeResult = await sql`SELECT NOW() as current_time, 'Connected!' as status`
+
+    // Get table count
+    const tableResult = await sql`
+      SELECT COUNT(*) as table_count 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `
+
+    // Get table names
+    const tablesResult = await sql`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `
+
+    const tables = tablesResult.map((row) => row.table_name)
+
+    // Get record counts for existing tables
+    const record_counts: Record<string, number | string> = {}
+
+    for (const table of tables) {
+      try {
+        const countResult = await sql`SELECT COUNT(*) as count FROM ${sql(table)}`
+        record_counts[table] = Number.parseInt(countResult[0].count)
+      } catch (error) {
+        record_counts[table] = "Error counting"
       }
-    } catch (error) {
-      result.error = `Connection failed: ${error instanceof Error ? error.message : "Unknown error"}`
-      return NextResponse.json(result)
     }
 
-    // Test table access and get counts
-    const tableCounts = {
-      users: 0,
-      bookings: 0,
-      travel_ideas: 0,
-      feature_requests: 0,
-    }
-
-    const sampleData = {
-      users: [],
-      bookings: [],
-    }
-
-    // Test users table
-    try {
-      const { rows: userCountRows } = await sql`SELECT COUNT(*) as count FROM users`
-      tableCounts.users = Number.parseInt(userCountRows[0]?.count || "0")
-
-      const { rows: sampleUsers } = await sql`SELECT id, email, name, role, status FROM users LIMIT 3`
-      sampleData.users = sampleUsers
-    } catch (error) {
-      result.errors.users = error instanceof Error ? error.message : "Unknown error"
-    }
-
-    // Test bookings table
-    try {
-      const { rows: bookingCountRows } = await sql`SELECT COUNT(*) as count FROM bookings`
-      tableCounts.bookings = Number.parseInt(bookingCountRows[0]?.count || "0")
-
-      const { rows: sampleBookings } =
-        await sql`SELECT id, booking_reference, destination, status, total_price FROM bookings LIMIT 3`
-      sampleData.bookings = sampleBookings
-    } catch (error) {
-      result.errors.bookings = error instanceof Error ? error.message : "Unknown error"
-    }
-
-    // Test travel_ideas table
-    try {
-      const { rows: ideasCountRows } = await sql`SELECT COUNT(*) as count FROM travel_ideas`
-      tableCounts.travel_ideas = Number.parseInt(ideasCountRows[0]?.count || "0")
-    } catch (error) {
-      result.errors.ideas = error instanceof Error ? error.message : "Unknown error"
-    }
-
-    // Test feature_requests table
-    try {
-      const { rows: featuresCountRows } = await sql`SELECT COUNT(*) as count FROM feature_requests`
-      tableCounts.feature_requests = Number.parseInt(featuresCountRows[0]?.count || "0")
-    } catch (error) {
-      result.errors.features = error instanceof Error ? error.message : "Unknown error"
-    }
-
-    result.table_counts = tableCounts
-    result.sample_data = sampleData
-    result.success = true
-
-    return NextResponse.json(result)
+    return NextResponse.json({
+      success: true,
+      message: "Database connection successful!",
+      timestamp: timeResult[0].current_time,
+      tables_found: Number.parseInt(tableResult[0].table_count),
+      tables: tables,
+      record_counts: record_counts,
+    })
   } catch (error) {
-    result.error = `Test failed: ${error instanceof Error ? error.message : "Unknown error"}`
-    return NextResponse.json(result)
+    console.error("Database connection error:", error)
+
+    // Parse error message for better troubleshooting
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    const troubleshooting = []
+
+    if (errorMessage.includes("authentication")) {
+      troubleshooting.push("Check your database username and password")
+      troubleshooting.push("Verify your DATABASE_URL format")
+    }
+
+    if (errorMessage.includes("connection")) {
+      troubleshooting.push("Check if your database is running")
+      troubleshooting.push("Verify the hostname in your DATABASE_URL")
+    }
+
+    if (errorMessage.includes("SSL") || errorMessage.includes("ssl")) {
+      troubleshooting.push("Add ?sslmode=require to your DATABASE_URL")
+    }
+
+    if (troubleshooting.length === 0) {
+      troubleshooting.push("Check your DATABASE_URL format")
+      troubleshooting.push("Verify your Neon database is active")
+      troubleshooting.push("Try copying the connection string again from Neon")
+    }
+
+    return NextResponse.json({
+      success: false,
+      error: errorMessage,
+      troubleshooting: troubleshooting,
+      setup_needed: true,
+    })
   }
 }
