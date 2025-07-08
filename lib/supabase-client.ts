@@ -1,4 +1,4 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createClient as _createSupabaseClient } from "@supabase/supabase-js"
 
 // Ensure environment variables are available
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -14,7 +14,7 @@ if (!supabaseAnonKey) {
 }
 
 // Client-side Supabase client (uses anon key)
-export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = _createSupabaseClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -23,7 +23,7 @@ export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
 
 // Server-side Supabase client (uses service role key)
 export const supabaseAdmin = supabaseServiceKey
-  ? createSupabaseClient(supabaseUrl, supabaseServiceKey, {
+  ? _createSupabaseClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -39,7 +39,7 @@ export function getSupabaseServiceClient() {
   if (!supabaseServiceKey) {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable")
   }
-  return createSupabaseClient(supabaseUrl, supabaseServiceKey, {
+  return _createSupabaseClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -49,21 +49,25 @@ export function getSupabaseServiceClient() {
 
 // Client-side Supabase client creation function
 export function createClient() {
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-  })
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error(
+      "Supabase environment variables ontbreken. " +
+        "Stel NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY in.",
+    )
+  }
+  return _createSupabaseClient(url, key)
 }
 
 // Server-side client creation function
 export function createServerClient() {
   if (!supabaseServiceKey) {
     console.warn("Missing SUPABASE_SERVICE_ROLE_KEY, falling back to anon key")
-    return createSupabaseClient(supabaseUrl, supabaseAnonKey)
+    return _createSupabaseClient(supabaseUrl, supabaseAnonKey)
   }
-  return createSupabaseClient(supabaseUrl, supabaseServiceKey, {
+  return _createSupabaseClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

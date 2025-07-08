@@ -1,76 +1,34 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase-client"
+import { sql } from "@/lib/neon-client"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const supabase = createClient()
-
-    const { data, error } = await supabase
-      .from("feature_comments")
-      .select("*")
-      .eq("feature_id", params.id)
-      .order("created_at", { ascending: true })
-
-    if (error) {
-      console.error("Supabase error:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data || [])
-  } catch (error) {
-    console.error("Error fetching comments:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
+function jsonError(msg: string, status = 400) {
+  return NextResponse.json({ error: msg }, { status })
 }
 
+/* ---------- GET ---------- */
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const { id } = params
+  const { rows } = await sql`SELECT * FROM feature_comments WHERE feature_id = ${id} ORDER BY created_at ASC`
+
+  return NextResponse.json(rows)
+}
+
+/* ---------- POST ---------- */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const body = await request.json()
-    const { comment, user_id } = body
+  const body = await request.json()
+  const { comment, user_id } = body as { comment?: string; user_id?: string }
 
-    // Validation
-    if (!comment || !comment.trim()) {
-      return NextResponse.json({ error: "Comment is required" }, { status: 400 })
-    }
+  if (!comment?.trim()) return jsonError("Comment is required")
+  if (!user_id) return jsonError("User ID is required")
 
-    if (!user_id) {
-      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
-    }
+  // Bestaat feature?
+  const { rowCount: featureExists } = await sql`SELECT 1 FROM feature_requests WHERE id = ${params.id}`
+  if (!featureExists) return jsonError("Feature request not found", 404)
 
-    const supabase = createClient()
-
-    // Check if feature request exists
-    const { data: feature, error: featureError } = await supabase
-      .from("feature_requests")
-      .select("id")
-      .eq("id", params.id)
-      .single()
-
-    if (featureError || !feature) {
-      return NextResponse.json({ error: "Feature request not found" }, { status: 404 })
-    }
-
-    // Create comment
-    const { data, error } = await supabase
-      .from("feature_comments")
-      .insert([
-        {
-          feature_id: params.id,
-          user_id,
-          comment: comment.trim(),
-        },
-      ])
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Supabase error:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data, { status: 201 })
-  } catch (error) {
-    console.error("Error creating comment:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
+  const { rows } = await sql`
+    INSERT INTO feature_comments (feature_id, user_id, comment)
+    VALUES (${params.id}, ${user_id}, ${comment.trim()})
+    RETURNING *
+  `
+  return NextResponse.json(rows[0], { status: 201 })
 }
