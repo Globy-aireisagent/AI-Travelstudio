@@ -1,7 +1,17 @@
 import { neon } from "@neondatabase/serverless"
 
-// Neon database client
-const sql = neon(process.env.DATABASE_URL!)
+// Sanitize DATABASE_URL (strip optional "psql " prefix and surrounding quotes)
+const raw = process.env.DATABASE_URL ?? ""
+const sanitized = raw
+  .trim()
+  .replace(/^psql\s+/, "") // verwijder eventueel "psql "
+  .replace(/^['"]|['"]$/g, "") // verwijder omringende quotes
+
+const sql = neon(sanitized)
+
+if (!/^postgres(ql)?:\/\//.test(sanitized)) {
+  console.error("❌  DATABASE_URL lijkt niet op een geldige PostgreSQL-URL:", sanitized)
+}
 
 export { sql }
 
