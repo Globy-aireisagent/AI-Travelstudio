@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSupabaseServiceClient, supabase } from "@/lib/supabase-client"
+import { testConnection, isDatabaseAvailable } from "@/lib/neon-client"
 
 export async function GET(request: NextRequest) {
   try {
@@ -119,6 +120,30 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Test Neon database connection
+    if (!isDatabaseAvailable()) {
+      return NextResponse.json({
+        success: false,
+        error: "DATABASE_URL not configured",
+        demo: true,
+        instructions: [
+          "Set your DATABASE_URL in Vercel environment variables",
+          "Run the SQL scripts in your Neon console (step by step)",
+          "Refresh this page to test the connection",
+        ],
+      })
+    }
+
+    const connectionTest = await testConnection()
+
+    if (!connectionTest.success) {
+      return NextResponse.json({
+        success: false,
+        error: connectionTest.error,
+        demo: true,
+      })
+    }
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
@@ -136,14 +161,19 @@ export async function GET(request: NextRequest) {
         !serverTest.success && "Fix server-side Supabase connection",
         !tablesTest.success && "Check database table setup",
       ].filter(Boolean),
+      neonTest: {
+        success: connectionTest.success,
+        message: connectionTest.message,
+        timestamp: connectionTest.timestamp,
+        database: "Neon PostgreSQL",
+      },
     })
   } catch (error) {
     console.error("❌ Supabase test failed:", error)
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
-        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       },
       { status: 500 },
     )

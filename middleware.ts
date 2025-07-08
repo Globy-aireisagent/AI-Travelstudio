@@ -13,10 +13,11 @@ export function middleware(request: NextRequest) {
     "/terms",
     "/feature-request",
     "/test-neon",
-    "/test-supabase",
+    "/database-setup",
     "/api/feature-requests",
     "/api/test-neon",
-    "/api/test-supabase",
+    "/api/test-database-url",
+    "/api/travel-buddies",
   ]
 
   // Define admin paths that require special permissions
