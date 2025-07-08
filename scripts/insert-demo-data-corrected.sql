@@ -1,185 +1,132 @@
--- First ensure agencies exist with only existing columns
-INSERT INTO agencies (id, name, created_at, updated_at) 
-VALUES 
-    ('550e8400-e29b-41d4-a716-446655440002', 'Demo Travel Agency', NOW(), NOW())
-ON CONFLICT (id) DO UPDATE SET
-    name = EXCLUDED.name,
-    updated_at = NOW();
+-- This script inserts demo data with proper error handling and conflict resolution
 
--- Update agencies with additional columns if they exist
-DO $$
+-- First, let's ensure we have the correct table structure
+DO $$ 
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agencies' AND column_name = 'description') THEN
-        UPDATE agencies SET description = 'Main demo agency for testing' WHERE id = '550e8400-e29b-41d4-a716-446655440002';
-    END IF;
-    
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agencies' AND column_name = 'status') THEN
-        UPDATE agencies SET status = 'active' WHERE id = '550e8400-e29b-41d4-a716-446655440002';
+    -- Check if agencies table exists, if not create it
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'agencies' AND table_schema = 'public') THEN
+        CREATE TABLE agencies (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name VARCHAR(255) NOT NULL,
+            code VARCHAR(50),
+            contact_email VARCHAR(255),
+            contact_phone VARCHAR(50),
+            address JSONB,
+            settings JSONB,
+            active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
     END IF;
 END $$;
 
--- Insert demo users with only guaranteed existing columns
-INSERT INTO users (
-    id, 
-    email, 
-    name,
-    role, 
-    agency_id,
-    created_at,
-    updated_at
-) VALUES 
-(
-    '550e8400-e29b-41d4-a716-446655440001',
-    'admin@demo.com',
-    'Demo Admin',
-    'admin',
-    '550e8400-e29b-41d4-a716-446655440002',
-    NOW(),
-    NOW()
-),
-(
-    '550e8400-e29b-41d4-a716-446655440011',
-    'agent@demo.com',
-    'Demo Agent',
-    'agent',
-    '550e8400-e29b-41d4-a716-446655440002',
-    NOW(),
-    NOW()
-),
-(
-    '550e8400-e29b-41d4-a716-446655440013',
-    'client@demo.com',
-    'Demo Client',
-    'client',
-    '550e8400-e29b-41d4-a716-446655440002',
-    NOW(),
-    NOW()
-),
-(
-    '550e8400-e29b-41d4-a716-446655440014',
-    'superadmin@demo.com',
-    'Super Admin',
-    'super_admin',
-    NULL,
-    NOW(),
-    NOW()
-)
-ON CONFLICT (email) DO UPDATE SET
+-- Insert demo agencies with conflict handling
+INSERT INTO agencies (id, name, code, contact_email, contact_phone, active) VALUES
+('550e8400-e29b-41d4-a716-446655440001', 'Travel Pro Agency', 'TPA', 'info@travelpro.com', '+31-20-1234567', true),
+('550e8400-e29b-41d4-a716-446655440002', 'Global Adventures', 'GA', 'contact@globaladventures.com', '+31-20-7654321', true),
+('550e8400-e29b-41d4-a716-446655440003', 'City Break Specialists', 'CBS', 'hello@citybreaks.com', '+31-20-9876543', true)
+ON CONFLICT (id) DO UPDATE SET 
+    name = EXCLUDED.name,
+    code = EXCLUDED.code,
+    contact_email = EXCLUDED.contact_email,
+    contact_phone = EXCLUDED.contact_phone,
+    active = EXCLUDED.active,
+    updated_at = NOW();
+
+-- Insert demo users (without foreign key reference for now)
+INSERT INTO users (id, email, first_name, last_name, name, role, status, agency_name, active) VALUES
+('550e8400-e29b-41d4-a716-446655440011', 'admin@travelstudio.com', 'Admin', 'User', 'Admin User', 'super_admin', 'active', 'Travel Studio HQ', true),
+('550e8400-e29b-41d4-a716-446655440012', 'agent1@travelpro.com', 'Sarah', 'Johnson', 'Sarah Johnson', 'agent', 'active', 'Travel Pro Agency', true),
+('550e8400-e29b-41d4-a716-446655440013', 'agent2@globaladventures.com', 'Mike', 'Chen', 'Mike Chen', 'agent', 'active', 'Global Adventures', true),
+('550e8400-e29b-41d4-a716-446655440014', 'client1@example.com', 'Emma', 'Wilson', 'Emma Wilson', 'client', 'active', NULL, true)
+ON CONFLICT (email) DO UPDATE SET 
+    first_name = EXCLUDED.first_name,
+    last_name = EXCLUDED.last_name,
     name = EXCLUDED.name,
     role = EXCLUDED.role,
+    status = EXCLUDED.status,
+    agency_name = EXCLUDED.agency_name,
+    active = EXCLUDED.active,
     updated_at = NOW();
 
--- Update users with additional columns if they exist
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'first_name') THEN
-        UPDATE users SET first_name = 'Demo' WHERE email = 'admin@demo.com';
-        UPDATE users SET first_name = 'Demo' WHERE email = 'agent@demo.com';
-        UPDATE users SET first_name = 'Demo' WHERE email = 'client@demo.com';
-        UPDATE users SET first_name = 'Super' WHERE email = 'superadmin@demo.com';
-    END IF;
-    
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'last_name') THEN
-        UPDATE users SET last_name = 'Admin' WHERE email = 'admin@demo.com';
-        UPDATE users SET last_name = 'Agent' WHERE email = 'agent@demo.com';
-        UPDATE users SET last_name = 'Client' WHERE email = 'client@demo.com';
-        UPDATE users SET last_name = 'Admin' WHERE email = 'superadmin@demo.com';
-    END IF;
-    
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'status') THEN
-        UPDATE users SET status = 'active' WHERE email IN ('admin@demo.com', 'agent@demo.com', 'client@demo.com', 'superadmin@demo.com');
-    END IF;
-END $$;
+-- Insert demo feature requests
+INSERT INTO feature_requests (id, title, description, user_id, category, priority, status, votes) VALUES
+('550e8400-e29b-41d4-a716-446655440021', 'AI-Powered Trip Planning', 'Automatically generate personalized travel itineraries using AI based on user preferences, budget, and travel dates. This would save agents hours of manual planning time.', 'demo-user-1', 'ai', 'high', 'in_progress', 42),
+('550e8400-e29b-41d4-a716-446655440022', 'Mobile App for Agents', 'Native mobile application for travel agents to manage bookings and communicate with clients on the go. Should include offline capabilities for areas with poor connectivity.', 'demo-user-2', 'mobile', 'medium', 'planned', 28),
+('550e8400-e29b-41d4-a716-446655440023', 'Real-time Analytics Dashboard', 'Comprehensive analytics dashboard showing booking trends, revenue metrics, and customer insights in real-time. Include customizable widgets and export functionality.', 'demo-user-3', 'analytics', 'medium', 'open', 35),
+('550e8400-e29b-41d4-a716-446655440024', 'Enhanced UI/UX Design', 'Modern, intuitive interface redesign with improved user experience and accessibility features. Focus on reducing clicks needed for common tasks.', 'demo-user-4', 'ui', 'low', 'completed', 19),
+('550e8400-e29b-41d4-a716-446655440025', 'Integration with Payment Gateways', 'Seamless integration with popular payment processors like Stripe, PayPal, and local payment methods for different countries.', 'demo-user-5', 'integration', 'high', 'open', 31),
+('550e8400-e29b-41d4-a716-446655440026', 'Automated Email Marketing', 'Built-in email marketing system with templates for follow-ups, promotions, and customer retention campaigns.', 'demo-user-6', 'feature', 'medium', 'planned', 24)
+ON CONFLICT (id) DO UPDATE SET 
+    title = EXCLUDED.title,
+    description = EXCLUDED.description,
+    category = EXCLUDED.category,
+    priority = EXCLUDED.priority,
+    status = EXCLUDED.status,
+    votes = EXCLUDED.votes,
+    updated_at = NOW();
 
--- Insert demo feature requests with only guaranteed existing columns
-INSERT INTO feature_requests (
-    title,
-    description,
-    created_at,
-    updated_at
-) VALUES 
-(
-    'Mobile App Support',
-    'Add support for mobile applications to access the travel booking system',
-    NOW(),
-    NOW()
-),
-(
-    'Advanced Search Filters',
-    'Implement more sophisticated search and filtering options for bookings',
-    NOW(),
-    NOW()
-),
-(
-    'Real-time Notifications',
-    'Add push notifications for booking updates and travel alerts',
-    NOW() - INTERVAL '7 days',
-    NOW() - INTERVAL '1 day'
-),
-(
-    'Dark Mode Theme',
-    'Implement dark mode theme for better user experience during night hours',
-    NOW() - INTERVAL '3 days',
-    NOW() - INTERVAL '3 days'
-),
-(
-    'Export to PDF',
-    'Allow users to export travel itineraries and bookings to PDF format',
-    NOW() - INTERVAL '5 days',
-    NOW() - INTERVAL '2 days'
-);
+-- Insert demo feature votes
+INSERT INTO feature_votes (feature_id, user_id, vote_type) VALUES
+('550e8400-e29b-41d4-a716-446655440021', 'demo-user-1', 'up'),
+('550e8400-e29b-41d4-a716-446655440021', 'demo-user-2', 'up'),
+('550e8400-e29b-41d4-a716-446655440021', 'demo-user-3', 'up'),
+('550e8400-e29b-41d4-a716-446655440022', 'demo-user-1', 'up'),
+('550e8400-e29b-41d4-a716-446655440022', 'demo-user-4', 'down'),
+('550e8400-e29b-41d4-a716-446655440023', 'demo-user-2', 'up'),
+('550e8400-e29b-41d4-a716-446655440023', 'demo-user-5', 'up')
+ON CONFLICT (feature_id, user_id) DO UPDATE SET 
+    vote_type = EXCLUDED.vote_type;
 
--- Update feature requests with additional columns if they exist
-DO $$
-DECLARE
-    feature_id UUID;
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feature_requests' AND column_name = 'category') THEN
-        UPDATE feature_requests SET category = 'feature' WHERE title = 'Mobile App Support';
-        UPDATE feature_requests SET category = 'enhancement' WHERE title = 'Advanced Search Filters';
-        UPDATE feature_requests SET category = 'feature' WHERE title = 'Real-time Notifications';
-        UPDATE feature_requests SET category = 'enhancement' WHERE title = 'Dark Mode Theme';
-        UPDATE feature_requests SET category = 'feature' WHERE title = 'Export to PDF';
-    END IF;
-    
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feature_requests' AND column_name = 'priority') THEN
-        UPDATE feature_requests SET priority = 'high' WHERE title = 'Mobile App Support';
-        UPDATE feature_requests SET priority = 'medium' WHERE title = 'Advanced Search Filters';
-        UPDATE feature_requests SET priority = 'medium' WHERE title = 'Real-time Notifications';
-        UPDATE feature_requests SET priority = 'low' WHERE title = 'Dark Mode Theme';
-        UPDATE feature_requests SET priority = 'high' WHERE title = 'Export to PDF';
-    END IF;
-    
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feature_requests' AND column_name = 'status') THEN
-        UPDATE feature_requests SET status = 'pending' WHERE title = 'Mobile App Support';
-        UPDATE feature_requests SET status = 'in_progress' WHERE title = 'Advanced Search Filters';
-        UPDATE feature_requests SET status = 'completed' WHERE title = 'Real-time Notifications';
-        UPDATE feature_requests SET status = 'pending' WHERE title = 'Dark Mode Theme';
-        UPDATE feature_requests SET status = 'in_progress' WHERE title = 'Export to PDF';
-    END IF;
-    
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feature_requests' AND column_name = 'votes') THEN
-        UPDATE feature_requests SET votes = 15 WHERE title = 'Mobile App Support';
-        UPDATE feature_requests SET votes = 8 WHERE title = 'Advanced Search Filters';
-        UPDATE feature_requests SET votes = 22 WHERE title = 'Real-time Notifications';
-        UPDATE feature_requests SET votes = 5 WHERE title = 'Dark Mode Theme';
-        UPDATE feature_requests SET votes = 18 WHERE title = 'Export to PDF';
-    END IF;
-    
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'feature_requests' AND column_name = 'user_id') THEN
-        UPDATE feature_requests SET user_id = '550e8400-e29b-41d4-a716-446655440011' WHERE title IN ('Mobile App Support', 'Real-time Notifications', 'Export to PDF');
-        UPDATE feature_requests SET user_id = '550e8400-e29b-41d4-a716-446655440013' WHERE title IN ('Advanced Search Filters', 'Dark Mode Theme');
-    END IF;
-END $$;
+-- Insert demo feature comments
+INSERT INTO feature_comments (feature_id, user_id, user_name, comment) VALUES
+('550e8400-e29b-41d4-a716-446655440021', 'demo-user-1', 'Sarah Johnson', 'This would be a game-changer for our agency! We spend so much time manually creating itineraries.'),
+('550e8400-e29b-41d4-a716-446655440021', 'demo-user-2', 'Mike Chen', 'Love the idea! Could it also suggest alternative activities based on weather conditions?'),
+('550e8400-e29b-41d4-a716-446655440022', 'demo-user-3', 'Emma Wilson', 'A mobile app would be perfect for when I''m traveling with clients. Great suggestion!'),
+('550e8400-e29b-41d4-a716-446655440023', 'demo-user-4', 'Admin User', 'We''re already working on this! Should be available in Q2 2024.')
+ON CONFLICT DO NOTHING;
 
--- Verify the data was inserted
-SELECT 'Users count:' as info, COUNT(*) as count FROM users;
-SELECT 'Agencies count:' as info, COUNT(*) as count FROM agencies;
-SELECT 'Feature requests count:' as info, COUNT(*) as count FROM feature_requests;
+-- Insert demo bookings (using user IDs that exist)
+INSERT INTO bookings (id, booking_reference, user_id, status, destination, start_date, end_date, total_price, currency) VALUES
+('550e8400-e29b-41d4-a716-446655440031', 'BK-2024-001', '550e8400-e29b-41d4-a716-446655440014', 'active', 'Amsterdam, Netherlands', '2024-03-15', '2024-03-20', 1250.00, 'EUR'),
+('550e8400-e29b-41d4-a716-446655440032', 'BK-2024-002', '550e8400-e29b-41d4-a716-446655440014', 'completed', 'Paris, France', '2024-02-10', '2024-02-15', 980.50, 'EUR'),
+('550e8400-e29b-41d4-a716-446655440033', 'BK-2024-003', '550e8400-e29b-41d4-a716-446655440014', 'pending', 'Tokyo, Japan', '2024-05-01', '2024-05-10', 2850.00, 'EUR')
+ON CONFLICT (id) DO UPDATE SET 
+    booking_reference = EXCLUDED.booking_reference,
+    status = EXCLUDED.status,
+    destination = EXCLUDED.destination,
+    start_date = EXCLUDED.start_date,
+    end_date = EXCLUDED.end_date,
+    total_price = EXCLUDED.total_price,
+    updated_at = NOW();
 
--- Show sample data
-SELECT 'Sample users:' as info;
-SELECT email, role, name FROM users LIMIT 5;
+-- Insert demo travel ideas
+INSERT INTO travel_ideas (id, title, description, destination, duration_days, price_from, price_to, currency, category) VALUES
+('550e8400-e29b-41d4-a716-446655440041', 'Romantic Weekend in Paris', 'Experience the city of love with your partner. Includes luxury hotel, romantic dinners, and Seine river cruise.', 'Paris, France', 3, 450.00, 850.00, 'EUR', 'Romance'),
+('550e8400-e29b-41d4-a716-446655440042', 'Adventure in the Alps', 'Thrilling mountain adventure with hiking, skiing, and breathtaking views of the Swiss Alps.', 'Swiss Alps, Switzerland', 7, 1200.00, 2500.00, 'EUR', 'Adventure'),
+('550e8400-e29b-41d4-a716-446655440043', 'Cultural Tour of Italy', 'Discover the rich history and culture of Italy visiting Rome, Florence, and Venice.', 'Italy', 10, 1800.00, 3200.00, 'EUR', 'Culture')
+ON CONFLICT (id) DO UPDATE SET 
+    title = EXCLUDED.title,
+    description = EXCLUDED.description,
+    destination = EXCLUDED.destination,
+    duration_days = EXCLUDED.duration_days,
+    price_from = EXCLUDED.price_from,
+    price_to = EXCLUDED.price_to,
+    category = EXCLUDED.category,
+    updated_at = NOW();
 
-SELECT 'Sample feature requests:' as info;
-SELECT title, description FROM feature_requests LIMIT 5;
+-- Show summary of inserted data
+SELECT 'Summary of Demo Data' as info;
+SELECT 'Agencies' as table_name, COUNT(*) as count FROM agencies
+UNION ALL
+SELECT 'Users' as table_name, COUNT(*) as count FROM users
+UNION ALL
+SELECT 'Feature Requests' as table_name, COUNT(*) as count FROM feature_requests
+UNION ALL
+SELECT 'Feature Votes' as table_name, COUNT(*) as count FROM feature_votes
+UNION ALL
+SELECT 'Feature Comments' as table_name, COUNT(*) as count FROM feature_comments
+UNION ALL
+SELECT 'Bookings' as table_name, COUNT(*) as count FROM bookings
+UNION ALL
+SELECT 'Travel Ideas' as table_name, COUNT(*) as count FROM travel_ideas;

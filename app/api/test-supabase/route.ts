@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { getSupabaseServiceClient, supabase } from "@/lib/supabase-client"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     console.log("🧪 Testing Supabase connection...")
 
@@ -83,6 +83,40 @@ export async function GET() {
     } catch (error) {
       tablesTest = { success: false, tables: [], error: error.message }
       console.log("❌ Tables test failed:", error.message)
+    }
+
+    // Redirect to Neon Database test if Supabase is not used
+    if (
+      !envCheck.NEXT_PUBLIC_SUPABASE_URL ||
+      !envCheck.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      !envCheck.SUPABASE_SERVICE_ROLE_KEY
+    ) {
+      return NextResponse.json({
+        success: false,
+        message: "Supabase has been replaced with Neon Database",
+        redirect: "/test-neon",
+        timestamp: new Date().toISOString(),
+        environment: {
+          NEXT_PUBLIC_SUPABASE_URL: false,
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: false,
+          SUPABASE_SERVICE_ROLE_KEY: false,
+        },
+        tests: {
+          client: { success: false, error: "Supabase client removed" },
+          server: { success: false, error: "Supabase server client removed" },
+          tables: {
+            success: false,
+            tables: [],
+            error: "Please use /api/test-neon instead",
+          },
+        },
+        recommendations: [
+          "Use /test-neon page to test your Neon database connection",
+          "Set DATABASE_URL environment variable in Vercel",
+          "Run the SQL scripts in your Neon dashboard to create tables",
+          "Remove any remaining Supabase environment variables",
+        ],
+      })
     }
 
     return NextResponse.json({

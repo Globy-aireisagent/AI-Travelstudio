@@ -1,45 +1,62 @@
--- Verify all tables exist and have data
+-- Verify all tables exist and have correct structure
+SELECT 
+    table_name,
+    table_type
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+    AND table_name IN ('users', 'agencies', 'bookings', 'travel_ideas', 'feature_requests', 'feature_votes', 'feature_comments', 'webhook_events')
+ORDER BY table_name;
+
+-- Check table row counts
+SELECT 
+    'users' as table_name, COUNT(*) as row_count FROM users
+UNION ALL
+SELECT 
+    'agencies' as table_name, COUNT(*) as row_count FROM agencies
+UNION ALL
+SELECT 
+    'bookings' as table_name, COUNT(*) as row_count FROM bookings
+UNION ALL
+SELECT 
+    'travel_ideas' as table_name, COUNT(*) as row_count FROM travel_ideas
+UNION ALL
+SELECT 
+    'feature_requests' as table_name, COUNT(*) as row_count FROM feature_requests
+UNION ALL
+SELECT 
+    'feature_votes' as table_name, COUNT(*) as row_count FROM feature_votes
+UNION ALL
+SELECT 
+    'feature_comments' as table_name, COUNT(*) as row_count FROM feature_comments
+UNION ALL
+SELECT 
+    'webhook_events' as table_name, COUNT(*) as row_count FROM webhook_events;
+
+-- Verify foreign key relationships
+SELECT 
+    tc.table_name, 
+    kcu.column_name, 
+    ccu.table_name AS foreign_table_name,
+    ccu.column_name AS foreign_column_name 
+FROM 
+    information_schema.table_constraints AS tc 
+    JOIN information_schema.key_column_usage AS kcu
+      ON tc.constraint_name = kcu.constraint_name
+      AND tc.table_schema = kcu.table_schema
+    JOIN information_schema.constraint_column_usage AS ccu
+      ON ccu.constraint_name = tc.constraint_name
+      AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY' 
+    AND tc.table_schema = 'public'
+ORDER BY tc.table_name, kcu.column_name;
+
+-- Check indexes
 SELECT 
     schemaname,
     tablename,
-    (SELECT COUNT(*) FROM information_schema.columns WHERE table_name = tablename) as column_count
-FROM pg_tables 
-WHERE schemaname = 'public' 
-ORDER BY tablename;
-
--- Check demo data counts
-SELECT 'users' as table_name, COUNT(*) as record_count FROM users
-UNION ALL
-SELECT 'agencies', COUNT(*) FROM agencies
-UNION ALL
-SELECT 'bookings', COUNT(*) FROM bookings
-UNION ALL
-SELECT 'feature_requests', COUNT(*) FROM feature_requests
-UNION ALL
-SELECT 'feature_votes', COUNT(*) FROM feature_votes
-UNION ALL
-SELECT 'feature_comments', COUNT(*) FROM feature_comments
-UNION ALL
-SELECT 'travel_ideas', COUNT(*) FROM travel_ideas
-UNION ALL
-SELECT 'holiday_packages', COUNT(*) FROM holiday_packages;
-
--- Verify role constraint is working
-SELECT conname, pg_get_constraintdef(oid) 
-FROM pg_constraint 
-WHERE conrelid = 'users'::regclass 
-AND contype = 'c' 
-AND conname = 'users_role_check';
-
--- Test a sample query to make sure everything works
-SELECT 
-    u.name as user_name,
-    u.role,
-    a.name as agency_name,
-    COUNT(b.id) as booking_count
-FROM users u
-LEFT JOIN agencies a ON u.agency_id = a.id
-LEFT JOIN bookings b ON u.id = b.user_id
-WHERE u.email LIKE '%demo%'
-GROUP BY u.id, u.name, u.role, a.name
-ORDER BY u.role;
+    indexname,
+    indexdef
+FROM pg_indexes 
+WHERE schemaname = 'public'
+    AND tablename IN ('users', 'agencies', 'bookings', 'travel_ideas', 'feature_requests', 'feature_votes', 'feature_comments')
+ORDER BY tablename, indexname;

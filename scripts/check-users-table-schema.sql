@@ -1,41 +1,38 @@
--- Check the actual structure of the users table
+-- Check the current structure of the users table
 SELECT 
-    column_name, 
-    data_type, 
-    is_nullable, 
+    column_name,
+    data_type,
+    character_maximum_length,
+    is_nullable,
     column_default
 FROM information_schema.columns 
 WHERE table_name = 'users' 
+    AND table_schema = 'public'
 ORDER BY ordinal_position;
 
--- Check the actual structure of the agencies table
+-- Check constraints on the users table
 SELECT 
-    column_name, 
-    data_type, 
-    is_nullable, 
-    column_default
-FROM information_schema.columns 
-WHERE table_name = 'agencies' 
-ORDER BY ordinal_position;
+    conname as constraint_name,
+    contype as constraint_type,
+    pg_get_constraintdef(oid) as constraint_definition
+FROM pg_constraint 
+WHERE conrelid = 'users'::regclass
+ORDER BY conname;
 
--- Check the actual structure of the feature_requests table
+-- Check if the table exists and what type it is
 SELECT 
-    column_name, 
-    data_type, 
-    is_nullable, 
-    column_default
-FROM information_schema.columns 
-WHERE table_name = 'feature_requests' 
-ORDER BY ordinal_position;
+    table_name,
+    table_type,
+    table_schema
+FROM information_schema.tables 
+WHERE table_name = 'users' 
+    AND table_schema = 'public';
 
--- Also check constraints
-SELECT conname, pg_get_constraintdef(c.oid) 
-FROM pg_constraint c 
-JOIN pg_class t ON c.conrelid = t.oid 
-WHERE t.relname = 'users';
-
--- List all tables in the public schema
-SELECT tablename 
-FROM pg_tables 
-WHERE schemaname = 'public' 
-ORDER BY tablename;
+-- Check indexes on the users table
+SELECT 
+    indexname,
+    indexdef
+FROM pg_indexes 
+WHERE tablename = 'users' 
+    AND schemaname = 'public'
+ORDER BY indexname;
