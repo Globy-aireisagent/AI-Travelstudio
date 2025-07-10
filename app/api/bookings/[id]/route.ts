@@ -1,113 +1,53 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { safeQuery, isDatabaseAvailable, type Booking } from "@/lib/neon-client"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    if (!isDatabaseAvailable()) {
-      return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 })
-    }
+    const bookingId = params.id
+    console.log(`🔍 Fetching booking: ${bookingId}`)
 
-    const query = "SELECT * FROM bookings WHERE id = $1"
-    const { data: bookings, error } = await safeQuery<Booking>(query, [params.id])
+    const { data, error } = await supabase.from("bookings").select("*").eq("id", bookingId).single()
 
     if (error) {
-      console.error("Error fetching booking:", error)
-      return NextResponse.json({ success: false, error: "Database error" }, { status: 500 })
+      console.error("❌ Supabase error:", error)
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 })
     }
 
-    if (!bookings || bookings.length === 0) {
-      return NextResponse.json({ success: false, error: "Booking not found" }, { status: 404 })
+    if (!data) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 })
     }
+
+    console.log(`✅ Booking found: ${data.id}`)
 
     return NextResponse.json({
       success: true,
-      booking: bookings[0],
+      booking: {
+        id: data.id,
+        bookingReference: data.booking_reference,
+        title: data.title,
+        client: {
+          name: data.client_name,
+          email: data.client_email,
+          phone: data.client_phone,
+        },
+        destination: data.destination,
+        startDate: data.start_date,
+        endDate: data.end_date,
+        status: data.status,
+        totalPrice: data.total_price,
+        currency: data.currency,
+        accommodations: data.accommodations,
+        activities: data.activities,
+        transports: data.transports,
+        vouchers: data.vouchers,
+        webhookReceivedAt: data.webhook_received_at,
+        micrositeSource: data.microsite_source,
+      },
     })
   } catch (error) {
-    console.error("Error in booking API:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    if (!isDatabaseAvailable()) {
-      return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 })
-    }
-
-    const body = await request.json()
-    const updates: string[] = []
-    const values: any[] = []
-    let paramIndex = 1
-
-    // Build dynamic update query
-    Object.entries(body).forEach(([key, value]) => {
-      if (key !== "id") {
-        updates.push(`${key} = $${paramIndex}`)
-        values.push(typeof value === "object" ? JSON.stringify(value) : value)
-        paramIndex++
-      }
-    })
-
-    if (updates.length === 0) {
-      return NextResponse.json({ success: false, error: "No fields to update" }, { status: 400 })
-    }
-
-    updates.push(`updated_at = NOW()`)
-    values.push(params.id)
-
-    const query = `
-      UPDATE bookings 
-      SET ${updates.join(", ")} 
-      WHERE id = $${paramIndex} 
-      RETURNING *
-    `
-
-    const { data: bookings, error } = await safeQuery<Booking>(query, values)
-
-    if (error) {
-      console.error("Error updating booking:", error)
-      return NextResponse.json({ success: false, error: "Failed to update booking" }, { status: 400 })
-    }
-
-    if (!bookings || bookings.length === 0) {
-      return NextResponse.json({ success: false, error: "Booking not found" }, { status: 404 })
-    }
-
-    return NextResponse.json({
-      success: true,
-      booking: bookings[0],
-    })
-  } catch (error) {
-    console.error("Error updating booking:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
-  }
-}
-
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    if (!isDatabaseAvailable()) {
-      return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 })
-    }
-
-    const query = "DELETE FROM bookings WHERE id = $1 RETURNING id"
-    const { data: result, error } = await safeQuery<{ id: string }>(query, [params.id])
-
-    if (error) {
-      console.error("Error deleting booking:", error)
-      return NextResponse.json({ success: false, error: "Failed to delete booking" }, { status: 400 })
-    }
-
-    if (!result || result.length === 0) {
-      return NextResponse.json({ success: false, error: "Booking not found" }, { status: 404 })
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "Booking deleted successfully",
-    })
-  } catch (error) {
-    console.error("Error deleting booking:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    console.error("❌ Error fetching booking:", error)
+    return NextResponse.json({ error: "Failed to fetch booking" }, { status: 500 })
   }
 }

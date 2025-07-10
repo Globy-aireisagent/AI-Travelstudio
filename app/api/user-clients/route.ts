@@ -1,4 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,6 +64,26 @@ export async function POST(request: NextRequest) {
     if (!name || !email || !agentEmail) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
     }
+
+    // Later: Insert into Supabase
+    // const { data, error } = await supabase
+    //   .from('clients')
+    //   .insert({
+    //     name,
+    //     email,
+    //     phone,
+    //     address,
+    //     preferences,
+    //     emergency_contact: emergencyContact,
+    //     notes,
+    //     agent_email: agentEmail,
+    //     loyalty_level: 'Bronze',
+    //     booking_count: 0,
+    //     total_value: 0,
+    //     created_at: new Date().toISOString(),
+    //   })
+    //   .select()
+    //   .single()
 
     // For now, return mock response
     const newClient = {

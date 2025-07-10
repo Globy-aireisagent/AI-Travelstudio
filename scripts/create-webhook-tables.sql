@@ -1,41 +1,31 @@
--- Create webhook_events table
-CREATE TABLE IF NOT EXISTS webhook_events (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  event_type TEXT NOT NULL,
-  source TEXT NOT NULL,
-  payload JSONB NOT NULL,
-  processed BOOLEAN DEFAULT FALSE,
-  processed_at TIMESTAMP WITH TIME ZONE,
-  error_message TEXT,
-  retry_count INTEGER DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- Create bookings table
+CREATE TABLE IF NOT EXISTS bookings (
+  id TEXT PRIMARY KEY,
+  booking_reference TEXT NOT NULL,
+  title TEXT,
+  client_name TEXT,
+  client_email TEXT,
+  client_phone TEXT,
+  destination TEXT,
+  start_date TIMESTAMP,
+  end_date TIMESTAMP,
+  status TEXT DEFAULT 'CONFIRMED',
+  total_price DECIMAL(10,2) DEFAULT 0,
+  currency TEXT DEFAULT 'EUR',
+  accommodations JSONB DEFAULT '[]',
+  activities JSONB DEFAULT '[]',
+  transports JSONB DEFAULT '[]',
+  vouchers JSONB DEFAULT '[]',
+  raw_data JSONB,
+  webhook_received_at TIMESTAMP DEFAULT NOW(),
+  microsite_source TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create webhook_subscriptions table
-CREATE TABLE IF NOT EXISTS webhook_subscriptions (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  endpoint_url TEXT NOT NULL,
-  event_types TEXT[] NOT NULL,
-  secret_key TEXT,
-  active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create webhook_logs table with matching UUID type
-CREATE TABLE IF NOT EXISTS webhook_logs (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  webhook_event_id UUID REFERENCES webhook_events(id) ON DELETE CASCADE,
-  status TEXT NOT NULL,
-  response_data JSONB,
-  error_message TEXT,
-  processing_time_ms INTEGER,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create travel ideas table with all necessary columns
+-- Create travel ideas table
 CREATE TABLE IF NOT EXISTS travel_ideas (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT,
   destination TEXT,
@@ -49,16 +39,16 @@ CREATE TABLE IF NOT EXISTS travel_ideas (
   highlights JSONB DEFAULT '[]',
   included_services JSONB DEFAULT '[]',
   raw_data JSONB,
-  webhook_received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  webhook_received_at TIMESTAMP DEFAULT NOW(),
   microsite_source TEXT,
   status TEXT DEFAULT 'ACTIVE',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create holiday packages table with all necessary columns
+-- Create holiday packages table
 CREATE TABLE IF NOT EXISTS holiday_packages (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT,
   destination TEXT,
@@ -70,27 +60,19 @@ CREATE TABLE IF NOT EXISTS holiday_packages (
   exclusions JSONB DEFAULT '[]',
   images JSONB DEFAULT '[]',
   raw_data JSONB,
-  webhook_received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  webhook_received_at TIMESTAMP DEFAULT NOW(),
   microsite_source TEXT,
   status TEXT DEFAULT 'AVAILABLE',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create indexes for webhook_events
-CREATE INDEX IF NOT EXISTS idx_webhook_events_event_type ON webhook_events(event_type);
-CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);
-CREATE INDEX IF NOT EXISTS idx_webhook_events_created_at ON webhook_events(created_at);
-CREATE INDEX IF NOT EXISTS idx_webhook_events_source ON webhook_events(source);
-
--- Create indexes for webhook_subscriptions
-CREATE INDEX IF NOT EXISTS idx_webhook_subscriptions_active ON webhook_subscriptions(active);
-CREATE INDEX IF NOT EXISTS idx_webhook_subscriptions_endpoint ON webhook_subscriptions(endpoint_url);
-
--- Create indexes for webhook_logs
-CREATE INDEX IF NOT EXISTS idx_webhook_logs_event_id ON webhook_logs(webhook_event_id);
-CREATE INDEX IF NOT EXISTS idx_webhook_logs_status ON webhook_logs(status);
-CREATE INDEX IF NOT EXISTS idx_webhook_logs_created_at ON webhook_logs(created_at);
+-- Create indexes for bookings
+CREATE INDEX IF NOT EXISTS idx_bookings_booking_reference ON bookings(booking_reference);
+CREATE INDEX IF NOT EXISTS idx_bookings_client_email ON bookings(client_email);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+CREATE INDEX IF NOT EXISTS idx_bookings_start_date ON bookings(start_date);
+CREATE INDEX IF NOT EXISTS idx_bookings_webhook_received_at ON bookings(webhook_received_at);
 
 -- Create indexes for travel ideas
 CREATE INDEX IF NOT EXISTS idx_travel_ideas_destination ON travel_ideas(destination);
@@ -104,32 +86,23 @@ CREATE INDEX IF NOT EXISTS idx_holiday_packages_status ON holiday_packages(statu
 CREATE INDEX IF NOT EXISTS idx_holiday_packages_webhook_received_at ON holiday_packages(webhook_received_at);
 
 -- Enable Row Level Security
-ALTER TABLE webhook_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE webhook_subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE webhook_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE travel_ideas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE holiday_packages ENABLE ROW LEVEL SECURITY;
 
--- Create policies for webhook_events
-CREATE POLICY "Allow service role to manage webhook events" ON webhook_events
+-- Create policies for authenticated users
+CREATE POLICY "Allow authenticated users to read bookings" ON bookings
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow service role to manage bookings" ON bookings
   FOR ALL USING (auth.role() = 'service_role');
 
--- Create policies for webhook_subscriptions
-CREATE POLICY "Allow service role to manage webhook subscriptions" ON webhook_subscriptions
-  FOR ALL USING (auth.role() = 'service_role');
-
--- Create policies for webhook_logs
-CREATE POLICY "Allow service role to manage webhook logs" ON webhook_logs
-  FOR ALL USING (auth.role() = 'service_role');
-
--- Create policies for travel ideas
 CREATE POLICY "Allow authenticated users to read travel ideas" ON travel_ideas
   FOR SELECT USING (auth.role() = 'authenticated');
 
 CREATE POLICY "Allow service role to manage travel ideas" ON travel_ideas
   FOR ALL USING (auth.role() = 'service_role');
 
--- Create policies for holiday packages
 CREATE POLICY "Allow authenticated users to read holiday packages" ON holiday_packages
   FOR SELECT USING (auth.role() = 'authenticated');
 
