@@ -1,225 +1,99 @@
--- Users table
+-- Create agencies table first (no dependencies)
+CREATE TABLE IF NOT EXISTS agencies (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  code TEXT UNIQUE,
+  contact_email TEXT,
+  contact_phone TEXT,
+  address JSONB DEFAULT '{}',
+  settings JSONB DEFAULT '{}',
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create users table with UUID agency_id to match agencies.id
 CREATE TABLE IF NOT EXISTS users (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  first_name VARCHAR(100),
-  last_name VARCHAR(100),
-  role VARCHAR(50) DEFAULT 'agent' CHECK (role IN ('agent', 'admin', 'super_admin')),
-  status VARCHAR(50) DEFAULT 'pending_verification' CHECK (status IN ('pending_verification', 'active', 'inactive', 'suspended')),
-  
-  -- Travel Compositor koppeling
-  travel_compositor_id VARCHAR(100),
-  agency_name VARCHAR(255),
-  agency_id VARCHAR(100),
-  microsite_id VARCHAR(10),
-  
-  -- Security
-  email_verified BOOLEAN DEFAULT FALSE,
-  password_reset_required BOOLEAN DEFAULT TRUE,
-  
-  -- Import tracking
-  import_source VARCHAR(50) DEFAULT 'travel_compositor',
-  import_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  -- Timestamps
+  email TEXT UNIQUE NOT NULL,
+  full_name TEXT,
+  role TEXT DEFAULT 'agent', -- 'admin', 'agent', 'client'
+  agency_id UUID REFERENCES agencies(id) ON DELETE SET NULL,
+  microsite_access TEXT[] DEFAULT '{}',
+  preferences JSONB DEFAULT '{}',
+  last_login TIMESTAMP WITH TIME ZONE,
+  active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  last_login TIMESTAMP WITH TIME ZONE
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Bookings table
-CREATE TABLE IF NOT EXISTS bookings (
+-- Create user_sessions table
+CREATE TABLE IF NOT EXISTS user_sessions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  
-  -- Travel Compositor data
-  tc_booking_id VARCHAR(100) NOT NULL,
-  booking_reference VARCHAR(100),
-  microsite_id VARCHAR(10),
-  
-  -- Booking details
-  title VARCHAR(500),
-  destination VARCHAR(255),
-  start_date DATE,
-  end_date DATE,
-  status VARCHAR(50) DEFAULT 'confirmed',
-  
-  -- Client info (encrypted/hashed for privacy)
-  client_name VARCHAR(255),
-  client_email VARCHAR(255),
-  client_phone VARCHAR(50),
-  
-  -- Financial
-  total_price DECIMAL(10,2),
-  currency VARCHAR(3) DEFAULT 'EUR',
-  
-  -- JSON data for complex structures
-  accommodations JSONB DEFAULT '[]',
-  activities JSONB DEFAULT '[]',
-  transports JSONB DEFAULT '[]',
-  vouchers JSONB DEFAULT '[]',
-  
-  -- Import tracking
-  imported_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  original_data JSONB,
-  
-  -- Timestamps
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  -- Constraints
-  UNIQUE(tc_booking_id, microsite_id)
-);
-
--- Travel Ideas table
-CREATE TABLE IF NOT EXISTS travel_ideas (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  
-  -- Travel Compositor data
-  tc_idea_id VARCHAR(100) NOT NULL,
-  microsite_id VARCHAR(10),
-  
-  -- Idea details
-  title VARCHAR(500),
-  description TEXT,
-  image_url VARCHAR(1000),
-  creation_date DATE,
-  departure_date DATE,
-  
-  -- Pricing
-  price_per_person JSONB DEFAULT '{"amount": 0, "currency": "EUR"}',
-  total_price JSONB DEFAULT '{"amount": 0, "currency": "EUR"}',
-  
-  -- JSON data
-  themes JSONB DEFAULT '[]',
-  destinations JSONB DEFAULT '[]',
-  customer JSONB DEFAULT '{}',
-  counters JSONB DEFAULT '{}',
-  
-  -- Import tracking
-  imported_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  original_data JSONB,
-  
-  -- Timestamps
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  -- Constraints
-  UNIQUE(tc_idea_id, microsite_id)
-);
-
--- Email verification tokens (voor later)
-CREATE TABLE IF NOT EXISTS email_verification_tokens (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(255) UNIQUE NOT NULL,
+  session_token TEXT UNIQUE NOT NULL,
   expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  used_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Password reset tokens (voor later)
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(255) UNIQUE NOT NULL,
-  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  used_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Audit logs
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  action VARCHAR(100) NOT NULL,
-  resource_type VARCHAR(50),
-  resource_id VARCHAR(255),
-  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  details JSONB DEFAULT '{}',
   ip_address INET,
   user_agent TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Indexes voor performance
+-- Create user_bookings table (linking users to their bookings)
+CREATE TABLE IF NOT EXISTS user_bookings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
+  relationship TEXT DEFAULT 'owner', -- 'owner', 'collaborator', 'viewer'
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, booking_id)
+);
+
+-- Create indexes for agencies
+CREATE INDEX IF NOT EXISTS idx_agencies_code ON agencies(code);
+CREATE INDEX IF NOT EXISTS idx_agencies_active ON agencies(active);
+
+-- Create indexes for users
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_tc_id ON users(travel_compositor_id);
-CREATE INDEX IF NOT EXISTS idx_users_microsite ON users(microsite_id);
-CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_agency_id ON users(agency_id);
+CREATE INDEX IF NOT EXISTS idx_users_active ON users(active);
 
-CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
-CREATE INDEX IF NOT EXISTS idx_bookings_tc_id ON bookings(tc_booking_id);
-CREATE INDEX IF NOT EXISTS idx_bookings_microsite ON bookings(microsite_id);
-CREATE INDEX IF NOT EXISTS idx_bookings_dates ON bookings(start_date, end_date);
+-- Create indexes for user_sessions
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);
 
-CREATE INDEX IF NOT EXISTS idx_ideas_user_id ON travel_ideas(user_id);
-CREATE INDEX IF NOT EXISTS idx_ideas_tc_id ON travel_ideas(tc_idea_id);
-CREATE INDEX IF NOT EXISTS idx_ideas_microsite ON travel_ideas(microsite_id);
+-- Create indexes for user_bookings
+CREATE INDEX IF NOT EXISTS idx_user_bookings_user_id ON user_bookings(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_bookings_booking_id ON user_bookings(booking_id);
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
-
--- Row Level Security (RLS)
+-- Enable Row Level Security
+ALTER TABLE agencies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE travel_ideas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_bookings ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
--- Users kunnen alleen hun eigen data zien
-CREATE POLICY "Users can view own data" ON users
-  FOR SELECT USING (auth.uid()::text = id::text);
+-- Create policies for agencies
+CREATE POLICY "Authenticated users can read agencies" ON agencies
+  FOR SELECT USING (auth.role() = 'authenticated');
 
--- Admins kunnen alles zien van hun microsite
-CREATE POLICY "Admins can view microsite data" ON users
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM users admin_user 
-      WHERE admin_user.id::text = auth.uid()::text 
-      AND admin_user.role IN ('admin', 'super_admin')
-      AND (admin_user.role = 'super_admin' OR admin_user.microsite_id = users.microsite_id)
-    )
-  );
+CREATE POLICY "Service role can manage agencies" ON agencies
+  FOR ALL USING (auth.role() = 'service_role');
 
--- Bookings policies
-CREATE POLICY "Users can view own bookings" ON bookings
-  FOR SELECT USING (
-    user_id::text = auth.uid()::text OR
-    EXISTS (
-      SELECT 1 FROM users admin_user 
-      WHERE admin_user.id::text = auth.uid()::text 
-      AND admin_user.role IN ('admin', 'super_admin')
-      AND (admin_user.role = 'super_admin' OR admin_user.microsite_id = bookings.microsite_id)
-    )
-  );
+-- Create policies for users
+CREATE POLICY "Users can read their own data" ON users
+  FOR SELECT USING (auth.role() = 'authenticated');
 
--- Travel Ideas policies
-CREATE POLICY "Users can view own ideas" ON travel_ideas
-  FOR SELECT USING (
-    user_id::text = auth.uid()::text OR
-    EXISTS (
-      SELECT 1 FROM users admin_user 
-      WHERE admin_user.id::text = auth.uid()::text 
-      AND admin_user.role IN ('admin', 'super_admin')
-      AND (admin_user.role = 'super_admin' OR admin_user.microsite_id = travel_ideas.microsite_id)
-    )
-  );
+CREATE POLICY "Service role can manage users" ON users
+  FOR ALL USING (auth.role() = 'service_role');
 
--- Functions voor updated_at
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
+-- Create policies for user_sessions
+CREATE POLICY "Service role can manage sessions" ON user_sessions
+  FOR ALL USING (auth.role() = 'service_role');
 
--- Triggers voor updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Create policies for user_bookings
+CREATE POLICY "Users can read their booking relationships" ON user_bookings
+  FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE TRIGGER update_bookings_updated_at BEFORE UPDATE ON bookings
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_travel_ideas_updated_at BEFORE UPDATE ON travel_ideas
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE POLICY "Service role can manage user bookings" ON user_bookings
+  FOR ALL USING (auth.role() = 'service_role');

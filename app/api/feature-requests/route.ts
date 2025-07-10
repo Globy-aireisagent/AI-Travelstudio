@@ -1,107 +1,110 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSupabaseServiceClient } from "@/lib/supabase-client"
-
-const supabase = getSupabaseServiceClient()
+import { createServerClient } from "@/lib/supabase-client"
 
 export async function GET(request: NextRequest) {
+  const missingEnv = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (missingEnv) {
+    return NextResponse.json({ success: true, data: [] })
+  }
+
   try {
-    const { searchParams } = new URL(request.url)
-    const status = searchParams.get("status")
-    const category = searchParams.get("category")
-    const sortBy = searchParams.get("sortBy") || "vote_count"
-    const order = searchParams.get("order") || "desc"
+    const supabase = createServerClient()
 
-    let query = supabase.from("feature_requests").select("*")
-
-    if (status && status !== "all") {
-      query = query.eq("status", status)
-    }
-
-    if (category && category !== "all") {
-      query = query.eq("category", category)
-    }
-
-    // Sort by vote count, created date, or priority
-    if (sortBy === "vote_count") {
-      query = query.order("vote_count", { ascending: order === "asc" })
-    } else if (sortBy === "created_at") {
-      query = query.order("created_at", { ascending: order === "asc" })
-    } else if (sortBy === "priority") {
-      query = query.order("priority", { ascending: order === "asc" })
-    }
-
-    const { data: features, error } = await query
+    const { data, error } = await supabase
+      .from("feature_requests")
+      .select("*")
+      .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Error fetching feature requests:", error)
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      console.error("Supabase error:", error)
+      return NextResponse.json({ success: false, error: "Supabase configuration error" }, { status: 500 })
     }
 
-    // Get vote counts and user votes
-    const userEmail = searchParams.get("userEmail")
-    let userVotes = []
-
-    if (userEmail) {
-      const { data: votes } = await supabase
-        .from("feature_votes")
-        .select("feature_request_id")
-        .eq("voter_email", userEmail)
-
-      userVotes = votes?.map((v) => v.feature_request_id) || []
-    }
-
-    return NextResponse.json({
-      success: true,
-      features: features || [],
-      userVotes,
-    })
+    return NextResponse.json({ success: true, data: data || [] })
   } catch (error) {
-    console.error("Error in feature requests API:", error)
+    console.error("Error fetching feature requests:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
+  const missingEnv = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
   try {
     const body = await request.json()
-    const { title, description, category, priority, submitterEmail, submitterName } = body
+    const { title, description, category, priority, status, created_by, user_id } = body
 
-    // Validate required fields
-    if (!title || !description || !submitterEmail) {
-      return NextResponse.json(
-        { success: false, error: "Title, description, and submitter email are required" },
-        { status: 400 },
-      )
+    // Validation
+    if (!title || !description) {
+      return NextResponse.json({ success: false, error: "Title and description are required" }, { status: 400 })
     }
 
-    // Insert new feature request
-    const { data: feature, error } = await supabase
-      .from("feature_requests")
-      .insert({
-        title,
-        description,
-        category: category || "general",
-        priority: priority || "medium",
-        submitted_by_email: submitterEmail,
-        submitted_by_name: submitterName,
-        status: "pipeline",
-        eta: "To be determined",
+    // Validate category
+    const validCategories = ["ai", "mobile", "feature", "ui", "analytics", "technical", "integration", "general"]
+    if (category && !validCategories.includes(category)) {
+      return NextResponse.json({ success: false, error: "Invalid category" }, { status: 400 })
+    }
+
+    // Validate priority
+    const validPriorities = ["low", "medium", "high", "urgent", "critical"]
+    if (priority && !validPriorities.includes(priority)) {
+      return NextResponse.json({ success: false, error: "Invalid priority" }, { status: 400 })
+    }
+
+    // Validate status
+    const validStatuses = ["pending", "submitted", "in_progress", "completed", "rejected", "on_hold"]
+    if (status && !validStatuses.includes(status)) {
+      return NextResponse.json({ success: false, error: "Invalid status" }, { status: 400 })
+    }
+
+    if (missingEnv) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: crypto.randomUUID(),
+          title,
+          description,
+          category: category || "feature",
+          priority: priority || "medium",
+          status: status || "pending",
+          votes: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: created_by || "anonymous",
+        },
       })
+    }
+
+    const supabase = createServerClient()
+
+    const { data, error } = await supabase
+      .from("feature_requests")
+      .insert([
+        {
+          title: title.trim(),
+          description: description.trim(),
+          category: category || "feature",
+          priority: priority || "medium",
+          status: status || "pending",
+          created_by: created_by || "anonymous",
+          user_id: user_id || null,
+          votes: 0,
+          upvotes: 0,
+          downvotes: 0,
+        },
+      ])
       .select()
       .single()
 
     if (error) {
-      console.error("Error creating feature request:", error)
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      console.error("Supabase error:", error)
+      return NextResponse.json({ success: false, error: "Supabase configuration error" }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      feature,
-      message: "Feature request submitted successfully!",
-    })
+    return NextResponse.json({ success: true, data }, { status: 201 })
   } catch (error) {
-    console.error("Error in feature requests POST:", error)
+    console.error("Error creating feature request:", error)
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }

@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSupabaseServiceClient } from "@/lib/supabase-client"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabaseServiceClient()
-
   try {
     const { searchParams } = new URL(request.url)
     const limit = Number.parseInt(searchParams.get("limit") || "50")
@@ -15,12 +15,17 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("bookings")
-      .select("*", { count: "exact" })
+      .select("*")
       .order("webhook_received_at", { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (status) query = query.eq("status", status)
-    if (clientEmail) query = query.eq("client_email", clientEmail)
+    if (status) {
+      query = query.eq("status", status)
+    }
+
+    if (clientEmail) {
+      query = query.eq("client_email", clientEmail)
+    }
 
     const { data, error, count } = await query
 
@@ -38,7 +43,10 @@ export async function GET(request: NextRequest) {
           id: booking.id,
           bookingReference: booking.booking_reference,
           title: booking.title,
-          client: { name: booking.client_name, email: booking.client_email },
+          client: {
+            name: booking.client_name,
+            email: booking.client_email,
+          },
           destination: booking.destination,
           startDate: booking.start_date,
           endDate: booking.end_date,
@@ -46,11 +54,15 @@ export async function GET(request: NextRequest) {
           totalPrice: booking.total_price,
           currency: booking.currency,
           webhookReceivedAt: booking.webhook_received_at,
-        })) ?? [],
-      pagination: { limit, offset, total: count ?? 0 },
+        })) || [],
+      pagination: {
+        limit,
+        offset,
+        total: count || 0,
+      },
     })
-  } catch (err) {
-    console.error("❌ Error fetching bookings:", err)
+  } catch (error) {
+    console.error("❌ Error fetching bookings:", error)
     return NextResponse.json({ error: "Failed to fetch bookings" }, { status: 500 })
   }
 }
