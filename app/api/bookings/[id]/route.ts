@@ -1,24 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSupabaseServiceClient } from "@/lib/supabase-client"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   const supabase = getSupabaseServiceClient()
+
   try {
-    const bookingId = params.id
-    console.log(`🔍 Fetching booking: ${bookingId}`)
+    const { data, error } = await supabase.from("bookings").select("*").eq("id", params.id).single()
 
-    const { data, error } = await supabase.from("bookings").select("*").eq("id", bookingId).single()
-
-    if (error) {
-      console.error("❌ Supabase error:", error)
+    if (error || !data) {
+      console.error("❌ Supabase error:", error ?? "No booking")
       return NextResponse.json({ error: "Booking not found" }, { status: 404 })
     }
-
-    if (!data) {
-      return NextResponse.json({ error: "Booking not found" }, { status: 404 })
-    }
-
-    console.log(`✅ Booking found: ${data.id}`)
 
     return NextResponse.json({
       success: true,
@@ -45,8 +37,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         micrositeSource: data.microsite_source,
       },
     })
-  } catch (error) {
-    console.error("❌ Error fetching booking:", error)
+  } catch (err) {
+    console.error("❌ Error fetching booking:", err)
     return NextResponse.json({ error: "Failed to fetch booking" }, { status: 500 })
   }
 }
