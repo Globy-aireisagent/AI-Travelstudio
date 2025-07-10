@@ -4,8 +4,13 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// Client-side Supabase client (voor frontend)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+/** Returns a browser/edge-safe Supabase client (anon key) */
+export function getBrowserSupabase() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("❌ Supabase env-vars NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are missing")
+  }
+  return createClient(supabaseUrl, supabaseAnonKey)
+}
 
 // Server-side Supabase client (voor API routes)
 export function getSupabaseServiceClient() {
