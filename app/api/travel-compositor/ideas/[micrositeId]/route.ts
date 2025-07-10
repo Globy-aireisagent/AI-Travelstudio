@@ -4,24 +4,15 @@ export async function GET(request: NextRequest, { params }: { params: { microsit
   try {
     const { micrositeId } = params
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get("search") || ""
-    const limit = Number.parseInt(searchParams.get("limit") || "20")
-    const offset = Number.parseInt(searchParams.get("offset") || "0")
-    const userRole = searchParams.get("userRole") || "agent"
-    const userEmail = searchParams.get("userEmail") || ""
-    const agencyId = searchParams.get("agencyId") || ""
+    const config = searchParams.get("config") || "1"
+    const limit = searchParams.get("limit") || "20"
 
-    console.log(`🔍 Fetching ideas from microsite ${micrositeId} for ${userRole}: ${userEmail}`)
+    console.log(`🔍 Fetching ideas from microsite ${micrositeId} using config ${config}`)
 
-    // Permission check
-    if (!userEmail) {
-      return NextResponse.json({ error: "User email required" }, { status: 401 })
-    }
-
-    // Get credentials for this microsite
+    // Get the appropriate credentials based on config
     let username, password, actualMicrositeId
 
-    switch (micrositeId) {
+    switch (config) {
       case "1":
         username = process.env.TRAVEL_COMPOSITOR_USERNAME
         password = process.env.TRAVEL_COMPOSITOR_PASSWORD
@@ -49,119 +40,81 @@ export async function GET(request: NextRequest, { params }: { params: { microsit
     }
 
     if (!username || !password || !actualMicrositeId) {
-      throw new Error(`Missing credentials for microsite ${micrositeId}`)
+      throw new Error(`Missing credentials for config ${config}`)
     }
 
-    // Authenticate first
-    const authResponse = await fetch("https://online.travelcompositor.com/resources/authentication/authenticate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        username,
-        password,
-        micrositeId: actualMicrositeId,
-      }),
-    })
+    // Create auth header
+    const auth = Buffer.from(`${username}:${password}`).toString("base64")
 
-    if (!authResponse.ok) {
-      throw new Error(`Authentication failed: ${authResponse.status}`)
-    }
+    // Try multiple possible endpoints for listing ideas
+    const endpoints = [
+      `https://api.travelcompositor.com/travelidea/${actualMicrositeId}`,
+      `https://api.travelcompositor.com/api/travelidea/${actualMicrositeId}`,
+      `https://api.travelcompositor.com/travelideas/${actualMicrositeId}`,
+      `https://api.travelcompositor.com/api/travelideas/${actualMicrositeId}`,
+    ]
 
-    const authData = await authResponse.json()
-    const token = authData.token
+    let lastError = null
 
-    // Fetch travel ideas with role-based filtering
-    let ideasUrl = `https://online.travelcompositor.com/resources/travelideas/${actualMicrositeId}?first=${offset}&limit=${limit}&lang=nl`
+    for (const apiUrl of endpoints) {
+      try {
+        console.log(`📡 Trying endpoint: ${apiUrl}`)
 
-    // For agents, filter by their email to only show their own ideas
-    if (userRole === "agent") {
-      ideasUrl += `&clientEmail=${encodeURIComponent(userEmail)}`
-    }
+        const response = await fetch(`${apiUrl}?lang=nl&limit=${limit}`, {
+          method: "GET",
+          headers: {
+            Authorization: `Basic ${auth}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        })
 
-    console.log(`📡 Fetching from: ${ideasUrl}`)
+        if (response.ok) {
+          const data = await response.json()
+          console.log("✅ Ideas retrieved from:", apiUrl)
+          console.log("📊 Response structure:", Object.keys(data))
+          console.log("📊 Ideas count:", Array.isArray(data) ? data.length : "Not an array")
 
-    const ideasResponse = await fetch(ideasUrl, {
-      headers: {
-        "auth-token": token,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-    })
+          // Handle different response formats
+          let ideas = []
+          if (Array.isArray(data)) {
+            ideas = data
+          } else if (data.ideas && Array.isArray(data.ideas)) {
+            ideas = data.ideas
+          } else if (data.content && Array.isArray(data.content)) {
+            ideas = data.content
+          } else if (data.results && Array.isArray(data.results)) {
+            ideas = data.results
+          }
 
-    if (!ideasResponse.ok) {
-      throw new Error(`Failed to fetch ideas: ${ideasResponse.status}`)
-    }
-
-    const ideasData = await ideasResponse.json()
-    let ideas = ideasData.travelIdea || ideasData.ideas || []
-
-    // Additional filtering for agents (double check)
-    if (userRole === "agent") {
-      ideas = ideas.filter((idea: any) => {
-        const ideaOwnerEmail = idea.customer?.email || idea.clientEmail || idea.user
-        return ideaOwnerEmail === userEmail
-      })
-    }
-
-    // Filter by search term if provided
-    if (search) {
-      ideas = ideas.filter(
-        (idea: any) =>
-          idea.title?.toLowerCase().includes(search.toLowerCase()) ||
-          idea.largeTitle?.toLowerCase().includes(search.toLowerCase()) ||
-          idea.description?.toLowerCase().includes(search.toLowerCase()) ||
-          idea.destinations?.some((dest: any) => dest.name?.toLowerCase().includes(search.toLowerCase())),
-      )
-    }
-
-    // Transform to lightweight format with permission info
-    const lightweightIdeas = ideas.map((idea: any) => {
-      const ideaOwnerEmail = idea.customer?.email || idea.clientEmail || idea.user
-
-      return {
-        id: idea.id?.toString(),
-        title: idea.title || idea.largeTitle,
-        shortDescription: idea.description
-          ? idea.description.substring(0, 150) + (idea.description.length > 150 ? "..." : "")
-          : "Geen beschrijving beschikbaar",
-        destinations:
-          idea.destinations?.map((dest: any) => ({
-            name: dest.name || dest.city || dest.location,
-          })) || [],
-        pricePerPerson: idea.pricePerPerson || { amount: 0, currency: "EUR" },
-        departureDate: idea.departureDate,
-        themes: idea.themes || [],
-        imageUrl: idea.imageUrl, // Keep remote URL
-        creationDate: idea.creationDate,
-        counters: idea.counters || {},
-
-        // Permission and ownership info
-        ownerEmail: ideaOwnerEmail,
-        agencyName: idea.agencyName || idea.agency?.name,
-        canImport: canUserImportIdea(idea, userRole, userEmail),
-        clientEmail: ideaOwnerEmail, // For API compatibility
+          return NextResponse.json({
+            success: true,
+            ideas,
+            total: ideas.length,
+            source: apiUrl,
+            rawResponse: data,
+          })
+        } else {
+          const errorText = await response.text()
+          console.log(`❌ Endpoint ${apiUrl} returned ${response.status}`)
+          lastError = `${response.status}: ${errorText.substring(0, 200)}...`
+        }
+      } catch (error) {
+        console.log(`❌ Endpoint ${apiUrl} failed:`, error)
+        lastError = error instanceof Error ? error.message : "Unknown error"
       }
-    })
+    }
 
-    console.log(`✅ Found ${lightweightIdeas.length} ideas for ${userRole} ${userEmail}`)
-
+    // If all endpoints failed, return error
     return NextResponse.json({
-      success: true,
-      ideas: lightweightIdeas,
-      total: lightweightIdeas.length,
-      micrositeId: actualMicrositeId,
-      search,
-      limit,
-      offset,
-      userRole,
-      userEmail,
-      filtered: userRole === "agent" ? "Only your own ideas" : "All accessible ideas",
+      success: false,
+      error: `No ideas found in microsite ${actualMicrositeId}. Tried ${endpoints.length} endpoints.`,
+      lastError,
+      endpointsTried: endpoints,
+      ideas: [],
     })
   } catch (error) {
-    console.error("❌ Error fetching remote ideas:", error)
+    console.error("❌ Error fetching ideas:", error)
     return NextResponse.json(
       {
         success: false,
@@ -171,21 +124,4 @@ export async function GET(request: NextRequest, { params }: { params: { microsit
       { status: 500 },
     )
   }
-}
-
-// Helper function to check import permissions
-function canUserImportIdea(idea: any, userRole: string, userEmail: string): boolean {
-  // Super admins can import everything
-  if (userRole === "super_admin") return true
-
-  // Admins can import everything from their accessible microsites
-  if (userRole === "admin") return true
-
-  // Agents can only import their own ideas
-  if (userRole === "agent") {
-    const ideaOwnerEmail = idea.customer?.email || idea.clientEmail || idea.user
-    return ideaOwnerEmail === userEmail
-  }
-
-  return false
 }

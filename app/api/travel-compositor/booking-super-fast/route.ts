@@ -1,68 +1,62 @@
 import type { NextRequest } from "next/server"
-import { createMultiMicrositeClient } from "@/lib/travel-compositor-client"
+import { client } from "@/lib/graphql"
 
 export async function GET(request: NextRequest) {
   try {
+    const startTime = Date.now()
     const searchParams = request.nextUrl.searchParams
     const bookingId = searchParams.get("bookingId")
-    const configNumber = Number.parseInt(searchParams.get("config") || "1")
-    const optimized = searchParams.get("optimized") === "true"
-
-    console.log(`🚀 SUPER FAST BOOKING API:`)
-    console.log(`- Booking ID: ${bookingId}`)
-    console.log(`- Config Number: ${configNumber}`)
-    console.log(`- Optimized: ${optimized}`)
 
     if (!bookingId) {
-      return Response.json({ success: false, error: "Missing bookingId parameter" }, { status: 400 })
+      return Response.json({ success: false, error: "Booking ID is required" }, { status: 400 })
     }
 
-    // Create multi-microsite client to search across all available microsites
-    const multiClient = createMultiMicrositeClient()
+    // Add timeout and proper error handling
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
-    console.log(`🔍 Searching for booking ${bookingId} across all microsites...`)
+    try {
+      const booking = await client.getBooking(bookingId, { signal: controller.signal })
+      clearTimeout(timeoutId)
 
-    // Search across all microsites
-    const result = await multiClient.searchBookingAcrossAllMicrosites(bookingId)
-
-    if (result) {
-      const { client, booking } = result
-
-      // Transform to roadbook format if optimized
-      let transformedBooking = booking
-      if (optimized) {
-        try {
-          transformedBooking = client.transformBookingToRoadbook(booking)
-          console.log(`✅ Booking transformed to roadbook format`)
-        } catch (error) {
-          console.log(`⚠️ Could not transform to roadbook format:`, error)
-          // Continue with original booking data
-        }
+      if (!booking) {
+        return Response.json(
+          {
+            success: false,
+            error: "Booking niet gevonden",
+            bookingId,
+          },
+          { status: 404 },
+        )
       }
 
       return Response.json({
         success: true,
-        booking: transformedBooking,
-        microsite: client.config.micrositeId,
-        method: "multi_microsite_search",
-        optimized,
-        searchedId: bookingId,
+        booking,
+        method: "super-fast",
+        responseTime: Date.now() - startTime,
       })
-    }
+    } catch (error) {
+      clearTimeout(timeoutId)
 
-    return Response.json({
-      success: false,
-      error: `Booking ${bookingId} not found in any microsite`,
-      searchedId: bookingId,
-      availableMicrosites: multiClient.getAllClients().map((c) => c.config.micrositeId),
-    })
+      if (error.name === "AbortError") {
+        return Response.json(
+          {
+            success: false,
+            error: "Request timeout - probeer opnieuw",
+          },
+          { status: 408 },
+        )
+      }
+
+      throw error
+    }
   } catch (error) {
-    console.error("❌ Super Fast Booking API Error:", error)
+    console.error("❌ Booking Super Fast Error:", error)
     return Response.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-        searchedId: request.nextUrl.searchParams.get("bookingId"),
+        error: error instanceof Error ? error.message : "Onbekende fout",
       },
       { status: 500 },
     )
