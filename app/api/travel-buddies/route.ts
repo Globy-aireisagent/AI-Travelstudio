@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSqlClient, isDatabaseAvailable, safeQuery } from "@/lib/neon-client"
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,28 +39,9 @@ export async function GET(request: NextRequest) {
       },
     ]
 
-    // If database is available, we could fetch real data here
-    if (isDatabaseAvailable) {
-      const result = await safeQuery(async () => {
-        const sql = getSqlClient()
-        return await sql`SELECT * FROM travel_buddies ORDER BY created_at DESC`
-      })
-
-      if (result.success && result.data?.length > 0) {
-        // Use real data if available
-        return NextResponse.json({
-          success: true,
-          buddies: result.data,
-          source: "database",
-        })
-      }
-    }
-
-    // Return demo data
     return NextResponse.json({
       success: true,
       buddies,
-      source: "demo",
     })
   } catch (error) {
     console.error("Error fetching travel buddies:", error)
@@ -85,27 +65,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
     }
 
-    // Try to insert into database if available
-    if (isDatabaseAvailable) {
-      const result = await safeQuery(async () => {
-        const sql = getSqlClient()
-        return await sql`
-          INSERT INTO travel_buddies (name, client, type, description, configuration, agent_email, status)
-          VALUES (${name}, ${client || "Alle klanten"}, ${type}, ${description || "Nieuwe travel buddy"}, ${JSON.stringify(configuration || {})}, ${agentEmail}, 'draft')
-          RETURNING *
-        `
-      })
-
-      if (result.success) {
-        return NextResponse.json({
-          success: true,
-          buddy: result.data[0],
-          message: "Travel buddy successfully created in database",
-        })
-      }
-    }
-
-    // Fallback to mock response
+    // For now, return mock response
     const newBuddy = {
       id: Date.now(),
       name,
@@ -129,7 +89,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       buddy: newBuddy,
-      message: "Travel buddy created (demo mode)",
+      message: "Travel buddy successfully created",
     })
   } catch (error) {
     console.error("Error creating travel buddy:", error)

@@ -3,9 +3,9 @@ import { type NextRequest, NextResponse } from "next/server"
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const userEmail = searchParams.get("email") || "demo@agent.com" // Demo data for now
+    const userEmail = searchParams.get("email") || "demo@agent.com"
 
-    // For now, return demo data until we have real imported bookings
+    // Demo data for bookings
     const demoBookings = [
       {
         id: 1,
@@ -53,13 +53,6 @@ export async function GET(request: NextRequest) {
         importedFrom: "travel-compositor",
       },
     ]
-
-    // Later: Query real bookings from Supabase
-    // const { data: bookings, error } = await supabase
-    //   .from('imported_bookings')
-    //   .select('*')
-    //   .eq('agent_email', userEmail)
-    //   .order('created_at', { ascending: false })
 
     return NextResponse.json({
       success: true,

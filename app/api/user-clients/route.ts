@@ -62,26 +62,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
     }
 
-    // Later: Insert into Supabase
-    // const { data, error } = await supabase
-    //   .from('clients')
-    //   .insert({
-    //     name,
-    //     email,
-    //     phone,
-    //     address,
-    //     preferences,
-    //     emergency_contact: emergencyContact,
-    //     notes,
-    //     agent_email: agentEmail,
-    //     loyalty_level: 'Bronze',
-    //     booking_count: 0,
-    //     total_value: 0,
-    //     created_at: new Date().toISOString(),
-    //   })
-    //   .select()
-    //   .single()
-
     // For now, return mock response
     const newClient = {
       id: Date.now(),
