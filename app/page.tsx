@@ -467,7 +467,7 @@ export default function Home() {
           </div>
 
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 AI-Travel Studio. Kip simpel voor reisbureaus.</p>
+            <p>&copy; 2024 AI-Travel Studio. Greetings Alex.</p>
           </div>
         </div>
       </footer>
