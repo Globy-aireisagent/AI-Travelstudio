@@ -31,7 +31,7 @@
     "@radix-ui/react-radio-group": "latest",
     "@radix-ui/react-scroll-area": "latest",
     "@radix-ui/react-select": "latest",
-    "@radix-ui/react-separator": "1.1.1",
+    "@radix-ui/react-separator": "latest",
     "@radix-ui/react-slider": "1.2.2",
     "@radix-ui/react-slot": "1.1.1",
     "@radix-ui/react-switch": "1.1.2",
@@ -66,6 +66,7 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
+    "web-speech-api": "latest",
     "ws": "latest",
     "zod": "^3.24.1"
   },
