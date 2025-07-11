@@ -2,7 +2,19 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plane, FileText, Bot, Globe, ArrowRight, Sparkles, CreditCard, MousePointer } from "lucide-react"
+import {
+  Plane,
+  FileText,
+  Bot,
+  Globe,
+  ArrowRight,
+  Sparkles,
+  CreditCard,
+  MousePointer,
+  MessageCircle,
+  Upload,
+  Zap,
+} from "lucide-react"
 
 export default function Home() {
   const coreFeatures = [
@@ -64,7 +76,7 @@ export default function Home() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4">
@@ -82,7 +94,10 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/agent-dashboard">
-                <Button variant="outline" className="rounded-xl shadow-sm hover:shadow-md transition-all">
+                <Button
+                  variant="outline"
+                  className="rounded-xl shadow-sm hover:shadow-md transition-all bg-transparent"
+                >
                   Inloggen
                 </Button>
               </Link>
@@ -130,7 +145,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="text-xl px-10 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1"
+                  className="text-xl px-10 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1 bg-transparent"
                 >
                   📺 Bekijk Demo (2 min)
                 </Button>
@@ -293,6 +308,117 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Travel Assistant App Section */}
+      <section className="py-16 px-4 bg-white/50">
+        <div className="container mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle>📄 Document Upload</CardTitle>
+                <CardDescription>Upload je reisdocumenten en laat AI ze analyseren</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/travelbuddy">
+                  <Button className="w-full">Start Upload</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle>🤖 TravelBuddy Chat</CardTitle>
+                <CardDescription>Chat met je persoonlijke AI reisassistent</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/travelbuddy/demo">
+                  <Button className="w-full">Start Chat</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle>📋 Intake Form</CardTitle>
+                <CardDescription>Vul je reisvoorkeuren in voor gepersonaliseerde tips</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/intake-preview">
+                  <Button className="w-full">Start Intake</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Travel Assistant App Section - Updated */}
+      <section className="py-16 px-4 bg-white/50">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">🌍 Travel Assistant App</h1>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Upload your travel documents, get AI-powered insights, and chat with your personal travel buddy
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5 text-blue-600" />
+                  Document Upload
+                </CardTitle>
+                <CardDescription>Upload PDFs, images, or paste URLs to extract travel information</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/travelbuddy">
+                  <Button className="w-full">Start Upload</Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-green-600" />
+                  Smart Processing
+                </CardTitle>
+                <CardDescription>
+                  AI extracts key details like dates, locations, and bookings automatically
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full bg-transparent">
+                  Learn More
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5 text-purple-600" />
+                  Travel Chat
+                </CardTitle>
+                <CardDescription>Chat with Globy, your AI travel assistant, about your trip</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full bg-transparent">
+                  Chat Now
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 bg-white px-6 py-3 rounded-full shadow-md">
+              <Zap className="h-4 w-4 text-yellow-500" />
+              <span className="text-sm font-medium">Powered by OpenAI GPT-4</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Simplicity Focus */}
       <section className="py-20 px-4 bg-gradient-to-r from-green-500 to-blue-600 text-white">
         <div className="container mx-auto text-center">
@@ -373,7 +499,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="text-xl px-10 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1"
+                  className="text-xl px-10 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1 bg-transparent"
                 >
                   📞 Bel Ons (Gratis)
                 </Button>
@@ -467,7 +593,7 @@ export default function Home() {
           </div>
 
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 AI-Travel Studio. Greetings Alex.</p>
+            <p>&copy; 2024 AI-Travel Studio. Kip simpel voor reisbureaus.</p>
           </div>
         </div>
       </footer>
