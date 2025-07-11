@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Mic, MicOff, Send, Volume2 } from "lucide-react"
+import { Mic, MicOff, Send, ArrowLeft, Volume2, VolumeX } from "lucide-react"
 import type { SpeechRecognition, SpeechRecognitionEvent } from "web-speech-api"
 
 interface Message {
@@ -18,28 +19,36 @@ interface Message {
 
 export default function TravelBuddyChatPage() {
   const { bookingId } = useParams<{ bookingId: string }>()
-  const router = useRouter()
   const [input, setInput] = useState("")
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
       sender: "globy",
-      text: "👋 Hallo! Ik ben Globy, jullie persoonlijke reisbuddy! Ik ken alle details van jullie reis en kan al jullie vragen beantwoorden. Wat wil je weten? 🌍",
+      text: `Hoi! Ik ben Globy, jullie persoonlijke reisassistent! 🌍 Ik ken alle details van jullie reis (booking ${bookingId}). Vraag me alles over jullie planning, restaurants, activiteiten, of gewoon een gezellig praatje! 😊`,
       timestamp: new Date(),
     },
   ])
   const [listening, setListening] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [speaking, setSpeaking] = useState(false)
+  const [speechEnabled, setSpeechEnabled] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
-  // Auto scroll naar laatste bericht
+  // Quick suggestion buttons
+  const quickSuggestions = [
+    "Wat zijn de beste restaurants?",
+    "Hoe is het weer morgen?",
+    "Wat moet ik zeker niet missen?",
+    "Geef me een geheime tip!",
+    "Hoe kom ik ergens?",
+  ]
+
+  // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Speech recognition setup
+  // Initialize speech recognition
   useEffect(() => {
     if (typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)) {
       const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -64,30 +73,28 @@ export default function TravelBuddyChatPage() {
     setMessages((prev) => [...prev, userMessage])
     setInput("")
 
+    // Add streaming message placeholder
+    const streamingMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      sender: "globy",
+      text: "",
+      timestamp: new Date(),
+      isStreaming: true,
+    }
+    setMessages((prev) => [...prev, streamingMessage])
+
     try {
-      const res = await fetch("/api/ask-globy", {
+      const response = await fetch("/api/ask-globy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId, vraag }),
       })
 
-      if (!res.ok) {
-        throw new Error("Network response was not ok")
-      }
+      if (!response.ok) throw new Error("Network response was not ok")
 
-      const reader = res.body?.getReader()
+      const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       let accumulatedText = ""
-
-      const globyMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: "globy",
-        text: "",
-        timestamp: new Date(),
-        isStreaming: true,
-      }
-
-      setMessages((prev) => [...prev, globyMessage])
 
       if (reader) {
         while (true) {
@@ -98,55 +105,52 @@ export default function TravelBuddyChatPage() {
           const lines = chunk.split("\n")
 
           for (const line of lines) {
-            if (line.startsWith("0:")) {
-              const content = line.slice(2)
-              accumulatedText += content
-
-              setMessages((prev) =>
-                prev.map((msg) => (msg.id === globyMessage.id ? { ...msg, text: accumulatedText } : msg)),
-              )
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6))
+                if (data.content) {
+                  accumulatedText += data.content
+                  setMessages((prev) =>
+                    prev.map((msg) => (msg.id === streamingMessage.id ? { ...msg, text: accumulatedText } : msg)),
+                  )
+                }
+              } catch (e) {
+                // Ignore parsing errors for incomplete chunks
+              }
             }
           }
         }
       }
 
-      // Finalize message
-      setMessages((prev) => prev.map((msg) => (msg.id === globyMessage.id ? { ...msg, isStreaming: false } : msg)))
+      // Finalize the message
+      setMessages((prev) => prev.map((msg) => (msg.id === streamingMessage.id ? { ...msg, isStreaming: false } : msg)))
 
-      // Speak the response
-      if (accumulatedText) {
-        speakText(accumulatedText)
+      // Speak the response if enabled
+      if (speechEnabled && accumulatedText) {
+        speek(accumulatedText)
       }
     } catch (error) {
       console.error("Error:", error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: "globy",
-        text: "Oeps! Er ging iets mis. Probeer het nog eens! 😅",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, errorMessage])
+      const errorMessage = "Sorry, er ging iets mis. Probeer het nog eens! 😅"
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === streamingMessage.id ? { ...msg, text: errorMessage, isStreaming: false } : msg)),
+      )
     }
 
     setLoading(false)
   }
 
-  const speakText = (text: string) => {
-    if ("speechSynthesis" in window) {
-      // Stop any current speech
-      window.speechSynthesis.cancel()
+  const speek = (text: string) => {
+    if (!speechEnabled) return
 
-      setSpeaking(true)
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.lang = "nl-NL"
-      utterance.rate = 0.9
-      utterance.pitch = 1.1
+    const synth = window.speechSynthesis
+    synth.cancel() // Stop any current speech
 
-      utterance.onend = () => setSpeaking(false)
-      utterance.onerror = () => setSpeaking(false)
-
-      window.speechSynthesis.speak(utterance)
-    }
+    const utter = new SpeechSynthesisUtterance(text)
+    utter.lang = "nl-NL"
+    utter.rate = 0.9
+    utter.pitch = 1.1
+    synth.speak(utter)
   }
 
   const startVoiceInput = () => {
@@ -156,24 +160,22 @@ export default function TravelBuddyChatPage() {
     }
 
     setListening(true)
+    recognitionRef.current.start()
 
     recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0][0].transcript
+      const vraag = event.results[0][0].transcript
       setListening(false)
-      sendVraag(transcript)
+      sendVraag(vraag)
     }
 
-    recognitionRef.current.onerror = (event) => {
+    recognitionRef.current.onerror = () => {
       setListening(false)
-      console.error("Speech recognition error:", event.error)
-      alert("Kon je stem niet begrijpen. Probeer opnieuw.")
+      alert("Kon je stem niet begrijpen. Probeer opnieuw! 🎤")
     }
 
     recognitionRef.current.onend = () => {
       setListening(false)
     }
-
-    recognitionRef.current.start()
   }
 
   const stopListening = () => {
@@ -183,88 +185,91 @@ export default function TravelBuddyChatPage() {
     setListening(false)
   }
 
-  const stopSpeaking = () => {
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel()
-      setSpeaking(false)
-    }
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString("nl-NL", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
   }
 
   return (
-    <div className="max-w-2xl mx-auto h-screen flex flex-col bg-gradient-to-br from-orange-50 to-blue-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b p-4 flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.push(`/travelbuddy/${bookingId}`)} className="p-2">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-r from-orange-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-            G
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
+      <div className="max-w-2xl mx-auto p-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <Link
+            href={`/travelbuddy/${bookingId}`}
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>Terug naar planning</span>
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <div className="text-2xl">🤖</div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">Globy Chat</h1>
+              <p className="text-sm text-gray-600">Je persoonlijke reisassistent</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-lg">Globy</h1>
-            <p className="text-xs text-gray-500">Je persoonlijke reisbuddy</p>
-          </div>
-        </div>
-        {speaking && (
-          <Button variant="outline" size="sm" onClick={stopSpeaking} className="ml-auto bg-transparent">
-            <Volume2 className="h-4 w-4 mr-1" />
-            Stop
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSpeechEnabled(!speechEnabled)}
+            className="flex items-center gap-1"
+          >
+            {speechEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </Button>
-        )}
-      </div>
+        </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
-            <Card
-              className={`max-w-[80%] ${message.sender === "user" ? "bg-blue-500 text-white" : "bg-white shadow-md"}`}
-            >
-              <CardContent className="p-3">
-                <div className={`text-sm ${message.sender === "user" ? "text-white" : "text-gray-800"}`}>
-                  {message.text}
-                  {message.isStreaming && <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse" />}
+        {/* Chat Messages */}
+        <Card className="h-[60vh] overflow-y-auto p-4 mb-4 bg-white/80 backdrop-blur-sm">
+          <div className="space-y-4">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[80%] p-3 rounded-2xl shadow-sm ${
+                    msg.sender === "user"
+                      ? "bg-blue-500 text-white rounded-br-md"
+                      : "bg-orange-100 text-gray-800 rounded-bl-md"
+                  }`}
+                >
+                  <p className="text-sm leading-relaxed">
+                    {msg.text}
+                    {msg.isStreaming && <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse">|</span>}
+                  </p>
+                  <p className={`text-xs mt-1 opacity-70 ${msg.sender === "user" ? "text-blue-100" : "text-gray-500"}`}>
+                    {formatTime(msg.timestamp)}
+                  </p>
                 </div>
-                <div className={`text-xs mt-1 ${message.sender === "user" ? "text-blue-100" : "text-gray-400"}`}>
-                  {message.timestamp.toLocaleTimeString("nl-NL", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
           </div>
-        ))}
+        </Card>
 
-        {loading && (
-          <div className="flex justify-start">
-            <Card className="bg-white shadow-md">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2 text-gray-500">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    />
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    />
-                  </div>
-                  <span className="text-sm">Globy denkt na...</span>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Quick Suggestions */}
+        {messages.length <= 1 && (
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 mb-2">💡 Probeer eens:</p>
+            <div className="flex flex-wrap gap-2">
+              {quickSuggestions.map((suggestion, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => sendVraag(suggestion)}
+                  className="text-xs bg-white/80 hover:bg-orange-50"
+                >
+                  {suggestion}
+                </Button>
+              ))}
+            </div>
           </div>
         )}
 
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="bg-white border-t p-4">
+        {/* Input Area */}
         <div className="flex gap-2">
           <Input
             type="text"
@@ -272,54 +277,35 @@ export default function TravelBuddyChatPage() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendVraag(input)}
             placeholder="Typ je vraag aan Globy..."
-            className="flex-1"
-            disabled={loading || listening}
+            className="flex-1 bg-white/80 backdrop-blur-sm"
+            disabled={loading}
           />
 
           <Button
             onClick={() => sendVraag(input)}
-            disabled={loading || !input.trim() || listening}
+            disabled={loading || !input.trim()}
             className="bg-blue-500 hover:bg-blue-600"
           >
-            <Send className="h-4 w-4" />
+            <Send className="w-4 h-4" />
           </Button>
 
           <Button
             onClick={listening ? stopListening : startVoiceInput}
             disabled={loading}
-            variant={listening ? "destructive" : "outline"}
-            className={listening ? "animate-pulse" : ""}
+            className={`${
+              listening ? "bg-red-500 hover:bg-red-600 animate-pulse" : "bg-orange-500 hover:bg-orange-600"
+            }`}
           >
-            {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </Button>
         </div>
 
+        {/* Status */}
         {listening && (
-          <div className="mt-2 text-center">
-            <p className="text-sm text-orange-600 animate-pulse">🎤 Luisteren... Spreek nu je vraag uit!</p>
-          </div>
+          <p className="text-center text-sm text-orange-600 mt-2 animate-pulse">🎤 Luisteren... spreek nu!</p>
         )}
 
-        <div className="mt-2 flex flex-wrap gap-2">
-          {[
-            "Wat doen we morgen?",
-            "Waar kunnen we lekker eten?",
-            "Hoe laat vertrekken we?",
-            "Wat kost dit ongeveer?",
-            "Tips voor de kinderen?",
-          ].map((suggestion) => (
-            <Button
-              key={suggestion}
-              variant="outline"
-              size="sm"
-              onClick={() => sendVraag(suggestion)}
-              disabled={loading || listening}
-              className="text-xs"
-            >
-              {suggestion}
-            </Button>
-          ))}
-        </div>
+        {loading && <p className="text-center text-sm text-blue-600 mt-2">🤖 Globy denkt na...</p>}
       </div>
     </div>
   )
